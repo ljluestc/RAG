@@ -1,0 +1,55 @@
+# Kubernetes RAG System Configuration
+
+# Embedding Model Configuration
+embedding:
+  model_name: "sentence-transformers/all-MiniLM-L6-v2"  # Fast and efficient
+  # Alternative: "sentence-transformers/all-mpnet-base-v2" for better quality
+  embedding_dim: 384
+  batch_size: 32
+
+# Vector Database Configuration
+vector_db:
+  type: "chromadb"
+  persist_directory: "./data/vector_db"
+  collection_name: "kubernetes_docs"
+  distance_metric: "cosine"
+
+# Document Processing Configuration
+document_processing:
+  chunk_size: 1000
+  chunk_overlap: 200
+  separators: ["\n\n", "\n", ". ", " ", ""]
+
+# Retrieval Configuration
+retrieval:
+  top_k: 5  # Number of chunks to retrieve
+  score_threshold: 0.7  # Minimum similarity score
+  rerank: true
+  rerank_top_k: 3
+
+# LLM Configuration
+llm:
+  provider: "openai"  # Options: "openai", "anthropic", "local"
+  model_name: "gpt-3.5-turbo"
+  temperature: 0.3
+  max_tokens: 1000
+
+  # For local models (optional)
+  local_model_path: null
+
+# API Configuration
+api:
+  host: "0.0.0.0"
+  port: 8000
+  reload: true
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan> - <level>{message}</level>"
+
+# Data Paths
+paths:
+  raw_data: "./data/raw"
+  processed_data: "./data/processed"
+  vector_db: "./data/vector_db"

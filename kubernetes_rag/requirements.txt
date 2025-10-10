@@ -1,0 +1,38 @@
+# Core RAG dependencies
+langchain==0.1.0
+langchain-community==0.0.10
+chromadb==0.4.22
+sentence-transformers==2.3.1
+
+# Document processing
+markdown==3.5.1
+beautifulsoup4==4.12.3
+python-markdown-math==0.8
+
+# Embeddings and ML
+torch==2.1.2
+transformers==4.36.2
+numpy==1.24.3
+
+# LLM Integration
+openai==1.7.2
+anthropic==0.8.1
+
+# API and CLI
+fastapi==0.109.0
+uvicorn==0.27.0
+click==8.1.7
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# Utilities
+python-dotenv==1.0.0
+tqdm==4.66.1
+requests==2.31.0
+
+# Testing
+pytest==7.4.4
+pytest-asyncio==0.23.3
+
+# Logging and monitoring
+loguru==0.7.2

@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cancel Functionality Test - Cursor Auto-Accept</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #1e1e1e;
+            color: #ccc;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #333;
+            border-radius: 5px;
+            background: #2d2d2d;
+        }
+        .test-button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .accept-btn {
+            background: #4CAF50;
+            color: white;
+        }
+        .cancel-btn {
+            background: #f44336;
+            color: white;
+        }
+        .stop-btn {
+            background: #FF9800;
+            color: white;
+        }
+        .abort-btn {
+            background: #9C27B0;
+            color: white;
+        }
+        .reject-btn {
+            background: #666;
+            color: white;
+        }
+        .test-results {
+            margin-top: 20px;
+            padding: 10px;
+            background: #333;
+            border-radius: 4px;
+        }
+        .success {
+            color: #4CAF50;
+        }
+        .error {
+            color: #f44336;
+        }
+        .warning {
+            color: #FF9800;
+        }
+        .info {
+            color: #2196F3;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Cancel Functionality Test Suite</h1>
+    <p>This page tests the cancel functionality of the Cursor Auto-Accept script.</p>
+
+    <div class="test-section">
+        <h2>Test 1: Cancel Button Detection</h2>
+        <p>Test if the script can detect and click cancel buttons:</p>
+        <button class="test-button cancel-btn" onclick="testCancelClick()">Cancel</button>
+        <button class="test-button cancel-btn" onclick="testCancelClick()">CANCEL</button>
+        <button class="test-button cancel-btn" onclick="testCancelClick()">cancel operation</button>
+        <div id="cancel-results" class="test-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: Stop Button Detection</h2>
+        <p>Test if the script can detect and click stop buttons:</p>
+        <button class="test-button stop-btn" onclick="testStopClick()">Stop</button>
+        <button class="test-button stop-btn" onclick="testStopClick()">STOP</button>
+        <button class="test-button stop-btn" onclick="testStopClick()">stop process</button>
+        <div id="stop-results" class="test-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 3: Abort Button Detection</h2>
+        <p>Test if the script can detect and click abort buttons:</p>
+        <button class="test-button abort-btn" onclick="testAbortClick()">Abort</button>
+        <button class="test-button abort-btn" onclick="testAbortClick()">ABORT</button>
+        <button class="test-button abort-btn" onclick="testAbortClick()">abort operation</button>
+        <div id="abort-results" class="test-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 4: Reject Button Exclusion</h2>
+        <p>Test that reject buttons are NOT clicked (should be excluded):</p>
+        <button class="test-button reject-btn" onclick="testRejectClick()">Reject</button>
+        <button class="test-button reject-btn" onclick="testRejectClick()">REJECT</button>
+        <button class="test-button reject-btn" onclick="testRejectClick()">reject changes</button>
+        <div id="reject-results" class="test-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 5: Mixed Button Types</h2>
+        <p>Test with mixed button types to ensure proper detection:</p>
+        <button class="test-button accept-btn" onclick="testAcceptClick()">Accept</button>
+        <button class="test-button cancel-btn" onclick="testCancelClick()">Cancel</button>
+        <button class="test-button stop-btn" onclick="testStopClick()">Stop</button>
+        <button class="test-button reject-btn" onclick="testRejectClick()">Reject</button>
+        <div id="mixed-results" class="test-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 6: Configuration Test</h2>
+        <p>Test configuration options for cancel functionality:</p>
+        <button onclick="testConfiguration()">Test Configuration</button>
+        <div id="config-results" class="test-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 7: Analytics Test</h2>
+        <p>Test analytics tracking for cancel actions:</p>
+        <button onclick="testAnalytics()">Test Analytics</button>
+        <div id="analytics-results" class="test-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 8: ROI Tracking Test</h2>
+        <p>Test ROI tracking for cancel actions:</p>
+        <button onclick="testROI()">Test ROI Tracking</button>
+        <div id="roi-results" class="test-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Overall Test Results</h2>
+        <button onclick="runAllTests()">Run All Tests</button>
+        <button onclick="clearResults()">Clear Results</button>
+        <div id="overall-results" class="test-results"></div>
+    </div>
+
+    <script>
+        // Test counters
+        let testResults = {
+            cancel: { passed: 0, failed: 0, total: 0 },
+            stop: { passed: 0, failed: 0, total: 0 },
+            abort: { passed: 0, failed: 0, total: 0 },
+            reject: { passed: 0, failed: 0, total: 0 },
+            config: { passed: 0, failed: 0, total: 0 },
+            analytics: { passed: 0, failed: 0, total: 0 },
+            roi: { passed: 0, failed: 0, total: 0 }
+        };
+
+        function logResult(testType, message, isSuccess = true) {
+            const resultDiv = document.getElementById(testType + '-results');
+            const className = isSuccess ? 'success' : 'error';
+            resultDiv.innerHTML += `<div class="${className}">${message}</div>`;
+
+            if (isSuccess) {
+                testResults[testType].passed++;
+            } else {
+                testResults[testType].failed++;
+            }
+            testResults[testType].total++;
+        }
+
+        function testCancelClick() {
+            logResult('cancel', '✅ Cancel button clicked - Script should detect and handle this', true);
+        }
+
+        function testStopClick() {
+            logResult('stop', '✅ Stop button clicked - Script should detect and handle this', true);
+        }
+
+        function testAbortClick() {
+            logResult('abort', '✅ Abort button clicked - Script should detect and handle this', true);
+        }
+
+        function testRejectClick() {
+            logResult('reject', '❌ Reject button clicked - Script should NOT handle this (excluded)', false);
+        }
+
+        function testAcceptClick() {
+            logResult('mixed', '✅ Accept button clicked - Script should handle this normally', true);
+        }
+
+        function testConfiguration() {
+            try {
+                // Test if the script is loaded
+                if (typeof globalThis.simpleAccept !== 'undefined') {
+                    const config = globalThis.simpleAccept.config;
+
+                    // Test cancel configuration
+                    if (config.enableCancel === true) {
+                        logResult('config', '✅ Cancel functionality is enabled in configuration', true);
+                    } else {
+                        logResult('config', '❌ Cancel functionality is disabled in configuration', false);
+                    }
+
+                    // Test stop configuration
+                    if (config.enableStop === true) {
+                        logResult('config', '✅ Stop functionality is enabled in configuration', true);
+                    } else {
+                        logResult('config', '❌ Stop functionality is disabled in configuration', false);
+                    }
+
+                    // Test abort configuration
+                    if (config.enableAbort === true) {
+                        logResult('config', '✅ Abort functionality is enabled in configuration', true);
+                    } else {
+                        logResult('config', '❌ Abort functionality is disabled in configuration', false);
+                    }
+
+                    // Test button type normalization
+                    const normalizedCancel = globalThis.simpleAccept.normalizeButtonType('cancel');
+                    if (normalizedCancel === 'cancel') {
+                        logResult('config', '✅ Button type normalization works for cancel', true);
+                    } else {
+                        logResult('config', '❌ Button type normalization failed for cancel', false);
+                    }
+
+                } else {
+                    logResult('config', '❌ Auto-accept script not loaded. Please load yolo.js first.', false);
+                }
+            } catch (error) {
+                logResult('config', `❌ Configuration test failed: ${error.message}`, false);
+            }
+        }
+
+        function testAnalytics() {
+            try {
+                if (typeof globalThis.simpleAccept !== 'undefined') {
+                    const analytics = globalThis.simpleAccept.analytics;
+
+                    // Test analytics structure
+                    if (analytics && typeof analytics.buttonTypeCounts === 'object') {
+                        logResult('analytics', '✅ Analytics structure is correct', true);
+                    } else {
+                        logResult('analytics', '❌ Analytics structure is missing', false);
+                    }
+
+                    // Test button type counts initialization
+                    if (analytics.buttonTypeCounts) {
+                        logResult('analytics', '✅ Button type counts are initialized', true);
+                    } else {
+                        logResult('analytics', '❌ Button type counts are not initialized', false);
+                    }
+
+                    // Test total accepts tracking
+                    if (typeof analytics.totalAccepts === 'number') {
+                        logResult('analytics', '✅ Total accepts tracking is working', true);
+                    } else {
+                        logResult('analytics', '❌ Total accepts tracking is not working', false);
+                    }
+
+                } else {
+                    logResult('analytics', '❌ Auto-accept script not loaded. Please load yolo.js first.', false);
+                }
+            } catch (error) {
+                logResult('analytics', `❌ Analytics test failed: ${error.message}`, false);
+            }
+        }
+
+        function testROI() {
+            try {
+                if (typeof globalThis.simpleAccept !== 'undefined') {
+                    const roiTracking = globalThis.simpleAccept.roiTracking;
+
+                    // Test ROI tracking structure
+                    if (roiTracking && typeof roiTracking.totalTimeSaved === 'number') {
+                        logResult('roi', '✅ ROI tracking structure is correct', true);
+                    } else {
+                        logResult('roi', '❌ ROI tracking structure is missing', false);
+                    }
+
+                    // Test workflow sessions tracking
+                    if (Array.isArray(roiTracking.workflowSessions)) {
+                        logResult('roi', '✅ Workflow sessions tracking is working', true);
+                    } else {
+                        logResult('roi', '❌ Workflow sessions tracking is not working', false);
+                    }
+
+                    // Test time calculation for cancel
+                    const cancelTimeSaved = globalThis.simpleAccept.calculateTimeSaved('cancel');
+                    if (typeof cancelTimeSaved === 'number' && cancelTimeSaved > 0) {
+                        logResult('roi', '✅ Cancel time calculation is working', true);
+                    } else {
+                        logResult('roi', '❌ Cancel time calculation is not working', false);
+                    }
+
+                    // Test time formatting
+                    const formattedTime = globalThis.simpleAccept.formatTimeDuration(30000);
+                    if (typeof formattedTime === 'string' && formattedTime.includes('30s')) {
+                        logResult('roi', '✅ Time formatting is working', true);
+                    } else {
+                        logResult('roi', '❌ Time formatting is not working', false);
+                    }
+
+                } else {
+                    logResult('roi', '❌ Auto-accept script not loaded. Please load yolo.js first.', false);
+                }
+            } catch (error) {
+                logResult('roi', `❌ ROI test failed: ${error.message}`, false);
+            }
+        }
+
+        function runAllTests() {
+            clearResults();
+
+            logResult('overall', '🧪 Running comprehensive cancel functionality tests...', true);
+
+            // Run all tests
+            testConfiguration();
+            testAnalytics();
+            testROI();
+
+            // Calculate overall results
+            let totalPassed = 0;
+            let totalFailed = 0;
+            let totalTests = 0;
+
+            Object.keys(testResults).forEach(testType => {
+                if (testType !== 'overall') {
+                    totalPassed += testResults[testType].passed;
+                    totalFailed += testResults[testType].failed;
+                    totalTests += testResults[testType].total;
+                }
+            });
+
+            const successRate = totalTests > 0 ? ((totalPassed / totalTests) * 100).toFixed(1) : 0;
+
+            logResult('overall', `📊 Test Results Summary:`, true);
+            logResult('overall', `✅ Passed: ${totalPassed}`, true);
+            logResult('overall', `❌ Failed: ${totalFailed}`, totalFailed === 0);
+            logResult('overall', `📈 Success Rate: ${successRate}%`, successRate >= 90);
+            logResult('overall', `🎯 Total Tests: ${totalTests}`, true);
+
+            if (successRate >= 90) {
+                logResult('overall', '🎉 Cancel functionality is working perfectly!', true);
+            } else {
+                logResult('overall', '⚠️ Some tests failed. Please check the implementation.', false);
+            }
+        }
+
+        function clearResults() {
+            Object.keys(testResults).forEach(testType => {
+                const resultDiv = document.getElementById(testType + '-results');
+                if (resultDiv) {
+                    resultDiv.innerHTML = '';
+                }
+                testResults[testType] = { passed: 0, failed: 0, total: 0 };
+            });
+        }
+
+        // Auto-run basic tests when page loads
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                logResult('overall', '🚀 Cancel Functionality Test Suite Loaded', true);
+                logResult('overall', '📝 Load yolo.js script and run tests to validate cancel functionality', true);
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

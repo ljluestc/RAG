@@ -20,7 +20,12 @@ def setup_logger(log_level: str = "INFO", log_file: str | None = None):
     # Add custom logger to stdout
     logger.add(
         sys.stdout,
-        format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan> - <level>{message}</level>",
+        format=(
+            "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+            "<level>{level: <8}</level> | "
+            "<cyan>{name}</cyan>:<cyan>{function}</cyan> - "
+            "<level>{message}</level>"
+        ),
         level=log_level,
         colorize=True,
     )
@@ -32,7 +37,10 @@ def setup_logger(log_level: str = "INFO", log_file: str | None = None):
 
         logger.add(
             log_file,
-            format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function} - {message}",
+            format=(
+                "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | "
+                "{name}:{function} - {message}"
+            ),
             level=log_level,
             rotation="10 MB",
             retention="1 week",

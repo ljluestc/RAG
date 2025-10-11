@@ -120,7 +120,8 @@ class HybridEmbedding:
     def encode_sparse(self, texts: Union[str, List[str]]) -> List[dict]:
         """
         Generate sparse embeddings (BM25-style).
-        This is a simplified version - in production you might use a proper BM25 implementation.
+        This is a simplified version - in production you might use a proper BM25
+        implementation.
         """
         if isinstance(texts, str):
             texts = [texts]

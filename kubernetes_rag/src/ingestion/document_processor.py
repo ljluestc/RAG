@@ -181,11 +181,13 @@ class DocumentChunker:
                 doc_metadata["section_title"] = section["title"]
                 doc_metadata["section_level"] = section["level"]
 
+                source_name = metadata.get("source", "unknown")
+                chunk_id = f"{source_name}_{section['title']}"
                 documents.append(
                     Document(
                         content=section_text,
                         metadata=doc_metadata,
-                        chunk_id=f"{metadata.get('source', 'unknown')}_{section['title']}",
+                        chunk_id=chunk_id,
                     )
                 )
             else:

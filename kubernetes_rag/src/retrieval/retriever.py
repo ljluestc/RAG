@@ -136,11 +136,11 @@ class Retriever:
 
         enhanced_results = []
         for result in results:
-            metadata = result["metadata"]
+            # metadata = result["metadata"]
 
             # Try to get surrounding chunks
-            chunk_index = metadata.get("chunk_index", 0)
-            source = metadata.get("source", "")
+            # chunk_index = metadata.get("chunk_index", 0)
+            # source = metadata.get("source", "")
 
             # This is a simplified version - in production you'd
             # retrieve actual surrounding chunks from the store

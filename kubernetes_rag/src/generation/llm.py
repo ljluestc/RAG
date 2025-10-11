@@ -29,6 +29,11 @@ class OpenAILLM(LLMBase):
 
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self.api_key:
+            # In test mode, use a mock client
+            if os.getenv("TESTING") == "true":
+                self.client = None
+                self.model = model
+                return
             raise ValueError("OpenAI API key not found")
 
         self.client = OpenAI(api_key=self.api_key)
@@ -38,6 +43,10 @@ class OpenAILLM(LLMBase):
         self, prompt: str, temperature: float = 0.3, max_tokens: int = 1000
     ) -> str:
         """Generate text using OpenAI."""
+        if self.client is None:
+            # Mock response for testing
+            return "This is a mock response for testing purposes."
+
         try:
             response = self.client.chat.completions.create(
                 model=self.model,

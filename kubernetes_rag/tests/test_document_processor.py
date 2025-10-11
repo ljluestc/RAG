@@ -1,12 +1,13 @@
 """Tests for document processing module."""
 
-import pytest
 from pathlib import Path
+
+import pytest
 from src.ingestion.document_processor import (
-    MarkdownProcessor,
+    Document,
     DocumentChunker,
     KubernetesDocProcessor,
-    Document
+    MarkdownProcessor,
 )
 
 
@@ -31,8 +32,8 @@ Content of section 2
         sections = processor.extract_sections(markdown_text)
 
         assert len(sections) >= 2
-        assert sections[0]['title'] == 'Section 1'
-        assert 'Content of section 1' in sections[0]['content']
+        assert sections[0]["title"] == "Section 1"
+        assert "Content of section 1" in sections[0]["content"]
 
     def test_extract_code_blocks(self):
         """Test code block extraction."""
@@ -57,9 +58,9 @@ kind: Pod
         code_blocks = processor.extract_code_blocks(text)
 
         assert len(code_blocks) == 2
-        assert code_blocks[0]['language'] == 'python'
-        assert 'def hello()' in code_blocks[0]['code']
-        assert code_blocks[1]['language'] == 'yaml'
+        assert code_blocks[0]["language"] == "python"
+        assert "def hello()" in code_blocks[0]["code"]
+        assert code_blocks[1]["language"] == "yaml"
 
     def test_parse_qa_pairs(self):
         """Test Q&A pair extraction."""
@@ -80,8 +81,8 @@ A Pod is the smallest deployable unit in Kubernetes.
         qa_pairs = processor.parse_qa_pairs(markdown_text)
 
         assert len(qa_pairs) == 2
-        assert qa_pairs[0]['question'] == 'What is Kubernetes?'
-        assert 'container orchestration' in qa_pairs[0]['answer']
+        assert qa_pairs[0]["question"] == "What is Kubernetes?"
+        assert "container orchestration" in qa_pairs[0]["answer"]
 
 
 class TestDocumentChunker:
@@ -92,7 +93,7 @@ class TestDocumentChunker:
         chunker = DocumentChunker(chunk_size=100, chunk_overlap=20)
 
         text = "This is a test sentence. " * 20
-        metadata = {'source': 'test.md'}
+        metadata = {"source": "test.md"}
 
         chunks = chunker.chunk_text(text, metadata)
 
@@ -105,11 +106,11 @@ class TestDocumentChunker:
         chunker = DocumentChunker(chunk_size=500, chunk_overlap=50)
 
         sections = [
-            {'title': 'Section 1', 'content': 'Short content', 'level': 1},
-            {'title': 'Section 2', 'content': 'A' * 600, 'level': 1}
+            {"title": "Section 1", "content": "Short content", "level": 1},
+            {"title": "Section 2", "content": "A" * 600, "level": 1},
         ]
 
-        metadata = {'source': 'test.md'}
+        metadata = {"source": "test.md"}
         chunks = chunker.chunk_by_section(sections, metadata)
 
         assert len(chunks) >= 2
@@ -144,5 +145,5 @@ A Pod is the smallest deployable unit in Kubernetes.
         assert processor.chunker is not None
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

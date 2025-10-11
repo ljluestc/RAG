@@ -30,6 +30,7 @@ cp .env.example .env
 ```
 
 Or use environment variable:
+
 ```bash
 export OPENAI_API_KEY="sk-your-key-here"
 ```
@@ -66,6 +67,7 @@ with open('k8s_basics.md', 'w') as f:
 ```
 
 Then ingest:
+
 ```bash
 python -m src.cli ingest k8s_basics.md
 ```
@@ -85,11 +87,13 @@ python -m src.cli interactive
 ### Option B: REST API
 
 Terminal 1 - Start server:
+
 ```bash
 python -m src.api
 ```
 
 Terminal 2 - Query:
+
 ```bash
 curl -X POST "http://localhost:8000/query" \
   -H "Content-Type: application/json" \
@@ -102,16 +106,19 @@ curl -X POST "http://localhost:8000/query" \
 ## Step 5: Explore Features
 
 ### Search without generating answer
+
 ```bash
 python -m src.cli search "kubernetes service" --top-k 3
 ```
 
 ### Filter by category
+
 ```bash
 python -m src.cli search "pod" --category qa_pair
 ```
 
 ### View statistics
+
 ```bash
 python -m src.cli stats
 ```
@@ -188,24 +195,29 @@ python -m src.api  # Start server on localhost:8000
 ## Troubleshooting
 
 **Q: "No module named 'src'"**
+
 - Run `pip install -e .` from the kubernetes_rag directory
 
 **Q: "OpenAI API key not found"**
+
 - Ensure `.env` file exists with `OPENAI_API_KEY=your-key`
 - Or set environment variable: `export OPENAI_API_KEY=your-key`
 
 **Q: "No results found"**
+
 - Make sure you've ingested documents first
 - Try lowering the score_threshold in config
 - Increase top_k value
 
 **Q: API server won't start**
+
 - Check if port 8000 is already in use
 - Try different port in config/config.yaml
 
 ## Support
 
 For issues, questions, or contributions:
+
 - Check the full README.md
 - Review the code documentation
 - Open an issue on GitHub

@@ -1,16 +1,18 @@
 """Configuration loader for the Kubernetes RAG system."""
 
-import yaml
+import os
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
+
+import yaml
+from dotenv import load_dotenv
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings
-from dotenv import load_dotenv
-import os
 
 
 class EmbeddingConfig(BaseModel):
     """Embedding model configuration."""
+
     model_name: str
     embedding_dim: int
     batch_size: int
@@ -18,6 +20,7 @@ class EmbeddingConfig(BaseModel):
 
 class VectorDBConfig(BaseModel):
     """Vector database configuration."""
+
     type: str
     persist_directory: str
     collection_name: str
@@ -26,6 +29,7 @@ class VectorDBConfig(BaseModel):
 
 class DocumentProcessingConfig(BaseModel):
     """Document processing configuration."""
+
     chunk_size: int
     chunk_overlap: int
     separators: list[str]
@@ -33,6 +37,7 @@ class DocumentProcessingConfig(BaseModel):
 
 class RetrievalConfig(BaseModel):
     """Retrieval configuration."""
+
     top_k: int
     score_threshold: float
     rerank: bool
@@ -41,6 +46,7 @@ class RetrievalConfig(BaseModel):
 
 class LLMConfig(BaseModel):
     """LLM configuration."""
+
     provider: str
     model_name: str
     temperature: float
@@ -50,6 +56,7 @@ class LLMConfig(BaseModel):
 
 class APIConfig(BaseModel):
     """API configuration."""
+
     host: str
     port: int
     reload: bool
@@ -57,12 +64,14 @@ class APIConfig(BaseModel):
 
 class LoggingConfig(BaseModel):
     """Logging configuration."""
+
     level: str
     format: str
 
 
 class PathsConfig(BaseModel):
     """Paths configuration."""
+
     raw_data: str
     processed_data: str
     vector_db: str
@@ -70,6 +79,7 @@ class PathsConfig(BaseModel):
 
 class Config(BaseModel):
     """Main configuration class."""
+
     embedding: EmbeddingConfig
     vector_db: VectorDBConfig
     document_processing: DocumentProcessingConfig
@@ -82,6 +92,7 @@ class Config(BaseModel):
 
 class Settings(BaseSettings):
     """Environment settings."""
+
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"

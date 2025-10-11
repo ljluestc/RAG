@@ -1,9 +1,10 @@
 """Embedding generation using sentence transformers."""
 
 from typing import List, Union
+
 import numpy as np
-from sentence_transformers import SentenceTransformer
 import torch
+from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 
 
@@ -13,7 +14,7 @@ class EmbeddingGenerator:
     def __init__(
         self,
         model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
-        device: str = None
+        device: str = None,
     ):
         """
         Initialize the embedding generator.
@@ -35,7 +36,7 @@ class EmbeddingGenerator:
         texts: Union[str, List[str]],
         batch_size: int = 32,
         show_progress: bool = True,
-        normalize: bool = True
+        normalize: bool = True,
     ) -> np.ndarray:
         """
         Generate embeddings for text(s).
@@ -57,16 +58,13 @@ class EmbeddingGenerator:
             batch_size=batch_size,
             show_progress_bar=show_progress,
             normalize_embeddings=normalize,
-            convert_to_numpy=True
+            convert_to_numpy=True,
         )
 
         return embeddings
 
     def encode_documents(
-        self,
-        documents: List,
-        batch_size: int = 32,
-        show_progress: bool = True
+        self, documents: List, batch_size: int = 32, show_progress: bool = True
     ) -> List[np.ndarray]:
         """
         Generate embeddings for a list of Document objects.
@@ -82,9 +80,7 @@ class EmbeddingGenerator:
         texts = [doc.content for doc in documents]
 
         embeddings = self.encode(
-            texts,
-            batch_size=batch_size,
-            show_progress=show_progress
+            texts, batch_size=batch_size, show_progress=show_progress
         )
 
         return embeddings
@@ -104,13 +100,17 @@ class EmbeddingGenerator:
         Returns:
             Query embedding
         """
-        return self.encode(query, batch_size=1, show_progress=False, normalize=normalize)[0]
+        return self.encode(
+            query, batch_size=1, show_progress=False, normalize=normalize
+        )[0]
 
 
 class HybridEmbedding:
     """Hybrid embedding combining dense and sparse representations."""
 
-    def __init__(self, dense_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
+    def __init__(
+        self, dense_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
+    ):
         self.dense_encoder = EmbeddingGenerator(dense_model_name)
 
     def encode_dense(self, texts: Union[str, List[str]], **kwargs) -> np.ndarray:
@@ -141,7 +141,7 @@ class HybridEmbedding:
         self,
         texts: Union[str, List[str]],
         dense_weight: float = 0.7,
-        sparse_weight: float = 0.3
+        sparse_weight: float = 0.3,
     ):
         """
         Generate hybrid embeddings.
@@ -158,7 +158,7 @@ class HybridEmbedding:
         sparse_embs = self.encode_sparse(texts)
 
         return {
-            'dense': dense_embs,
-            'sparse': sparse_embs,
-            'weights': {'dense': dense_weight, 'sparse': sparse_weight}
+            "dense": dense_embs,
+            "sparse": sparse_embs,
+            "weights": {"dense": dense_weight, "sparse": sparse_weight},
         }

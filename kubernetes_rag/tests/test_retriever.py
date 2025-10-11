@@ -1,8 +1,9 @@
 """Tests for retrieval module."""
 
-import pytest
+from unittest.mock import MagicMock, Mock
+
 import numpy as np
-from unittest.mock import Mock, MagicMock
+import pytest
 from src.retrieval.retriever import Retriever
 
 
@@ -25,27 +26,27 @@ class TestRetriever:
         # Mock search results
         vector_store.search_by_text.return_value = [
             {
-                'content': 'Test content 1',
-                'metadata': {'source': 'test1.md'},
-                'score': 0.9
+                "content": "Test content 1",
+                "metadata": {"source": "test1.md"},
+                "score": 0.9,
             },
             {
-                'content': 'Test content 2',
-                'metadata': {'source': 'test2.md'},
-                'score': 0.8
-            }
+                "content": "Test content 2",
+                "metadata": {"source": "test2.md"},
+                "score": 0.8,
+            },
         ]
 
         retriever = Retriever(
             vector_store=vector_store,
             embedding_generator=embedding_gen,
-            use_rerank=False
+            use_rerank=False,
         )
 
-        results = retriever.retrieve('test query', top_k=2)
+        results = retriever.retrieve("test query", top_k=2)
 
         assert len(results) == 2
-        assert results[0]['score'] == 0.9
+        assert results[0]["score"] == 0.9
 
     def test_score_threshold(self, mock_components):
         """Test score threshold filtering."""
@@ -53,58 +54,48 @@ class TestRetriever:
 
         vector_store.search_by_text.return_value = [
             {
-                'content': 'High score content',
-                'metadata': {'source': 'test1.md'},
-                'score': 0.9
+                "content": "High score content",
+                "metadata": {"source": "test1.md"},
+                "score": 0.9,
             },
             {
-                'content': 'Low score content',
-                'metadata': {'source': 'test2.md'},
-                'score': 0.3
-            }
+                "content": "Low score content",
+                "metadata": {"source": "test2.md"},
+                "score": 0.3,
+            },
         ]
 
         retriever = Retriever(
             vector_store=vector_store,
             embedding_generator=embedding_gen,
-            use_rerank=False
+            use_rerank=False,
         )
 
-        results = retriever.retrieve(
-            'test query',
-            top_k=5,
-            score_threshold=0.5
-        )
+        results = retriever.retrieve("test query", top_k=5, score_threshold=0.5)
 
         assert len(results) == 1
-        assert results[0]['score'] >= 0.5
+        assert results[0]["score"] >= 0.5
 
     def test_retrieve_by_category(self, mock_components):
         """Test category filtering."""
         vector_store, embedding_gen = mock_components
 
         vector_store.search_by_text.return_value = [
-            {
-                'content': 'Q&A content',
-                'metadata': {'type': 'qa_pair'},
-                'score': 0.9
-            }
+            {"content": "Q&A content", "metadata": {"type": "qa_pair"}, "score": 0.9}
         ]
 
         retriever = Retriever(
             vector_store=vector_store,
             embedding_generator=embedding_gen,
-            use_rerank=False
+            use_rerank=False,
         )
 
         results = retriever.retrieve_by_category(
-            'test query',
-            category='qa_pair',
-            top_k=5
+            "test query", category="qa_pair", top_k=5
         )
 
         assert len(results) == 1
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

@@ -1,9 +1,10 @@
 """Document processing and chunking for Kubernetes documentation."""
 
 import re
-from typing import List, Dict, Any
-from pathlib import Path
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List
+
 import markdown
 from bs4 import BeautifulSoup
 
@@ -11,6 +12,7 @@ from bs4 import BeautifulSoup
 @dataclass
 class Document:
     """Represents a processed document chunk."""
+
     content: str
     metadata: Dict[str, Any]
     chunk_id: str
@@ -20,17 +22,17 @@ class MarkdownProcessor:
     """Process and parse markdown files."""
 
     def __init__(self):
-        self.md = markdown.Markdown(extensions=['extra', 'codehilite', 'toc'])
+        self.md = markdown.Markdown(extensions=["extra", "codehilite", "toc"])
 
     def extract_sections(self, markdown_text: str) -> List[Dict[str, str]]:
         """Extract sections from markdown based on headers."""
         sections = []
         current_section = {"title": "", "content": "", "level": 0}
 
-        lines = markdown_text.split('\n')
+        lines = markdown_text.split("\n")
         for line in lines:
             # Check if line is a header
-            header_match = re.match(r'^(#{1,6})\s+(.+)$', line)
+            header_match = re.match(r"^(#{1,6})\s+(.+)$", line)
 
             if header_match:
                 # Save previous section if it has content
@@ -40,13 +42,9 @@ class MarkdownProcessor:
                 # Start new section
                 level = len(header_match.group(1))
                 title = header_match.group(2).strip()
-                current_section = {
-                    "title": title,
-                    "content": "",
-                    "level": level
-                }
+                current_section = {"title": title, "content": "", "level": level}
             else:
-                current_section["content"] += line + '\n'
+                current_section["content"] += line + "\n"
 
         # Add last section
         if current_section["content"].strip():
@@ -57,15 +55,12 @@ class MarkdownProcessor:
     def extract_code_blocks(self, text: str) -> List[Dict[str, str]]:
         """Extract code blocks from markdown."""
         code_blocks = []
-        pattern = r'```(\w+)?\n(.*?)```'
+        pattern = r"```(\w+)?\n(.*?)```"
 
         for match in re.finditer(pattern, text, re.DOTALL):
             language = match.group(1) or "text"
             code = match.group(2).strip()
-            code_blocks.append({
-                "language": language,
-                "code": code
-            })
+            code_blocks.append({"language": language, "code": code})
 
         return code_blocks
 
@@ -74,20 +69,19 @@ class MarkdownProcessor:
         qa_pairs = []
 
         # Pattern to match <summary> and content within <details>
-        pattern = r'<details>\s*<summary>(.*?)</summary><br><b>\s*(.*?)\s*</b></details>'
+        pattern = (
+            r"<details>\s*<summary>(.*?)</summary><br><b>\s*(.*?)\s*</b></details>"
+        )
 
         for match in re.finditer(pattern, markdown_text, re.DOTALL):
             question = match.group(1).strip()
             answer = match.group(2).strip()
 
             # Clean up the answer
-            answer = re.sub(r'<[^>]+>', '', answer)  # Remove HTML tags
-            answer = re.sub(r'\s+', ' ', answer).strip()  # Normalize whitespace
+            answer = re.sub(r"<[^>]+>", "", answer)  # Remove HTML tags
+            answer = re.sub(r"\s+", " ", answer).strip()  # Normalize whitespace
 
-            qa_pairs.append({
-                "question": question,
-                "answer": answer
-            })
+            qa_pairs.append({"question": question, "answer": answer})
 
         return qa_pairs
 
@@ -99,7 +93,7 @@ class DocumentChunker:
         self,
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
-        separators: List[str] = None
+        separators: List[str] = None,
     ):
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
@@ -133,14 +127,16 @@ class DocumentChunker:
         documents = []
         for i, chunk in enumerate(chunks):
             doc_metadata = metadata.copy()
-            doc_metadata['chunk_index'] = i
-            doc_metadata['total_chunks'] = len(chunks)
+            doc_metadata["chunk_index"] = i
+            doc_metadata["total_chunks"] = len(chunks)
 
-            documents.append(Document(
-                content=chunk,
-                metadata=doc_metadata,
-                chunk_id=f"{metadata.get('source', 'unknown')}_{i}"
-            ))
+            documents.append(
+                Document(
+                    content=chunk,
+                    metadata=doc_metadata,
+                    chunk_id=f"{metadata.get('source', 'unknown')}_{i}",
+                )
+            )
 
         return documents
 
@@ -159,7 +155,7 @@ class DocumentChunker:
             return text
 
         # Try to find a good breaking point
-        overlap = text[-self.chunk_overlap:]
+        overlap = text[-self.chunk_overlap :]
         for separator in self.separators:
             if separator in overlap:
                 parts = overlap.split(separator)
@@ -168,9 +164,7 @@ class DocumentChunker:
         return overlap
 
     def chunk_by_section(
-        self,
-        sections: List[Dict[str, str]],
-        metadata: Dict[str, Any] = None
+        self, sections: List[Dict[str, str]], metadata: Dict[str, Any] = None
     ) -> List[Document]:
         """Chunk by maintaining section boundaries when possible."""
         if metadata is None:
@@ -184,19 +178,21 @@ class DocumentChunker:
             # If section is small enough, keep it as one chunk
             if len(section_text) <= self.chunk_size:
                 doc_metadata = metadata.copy()
-                doc_metadata['section_title'] = section['title']
-                doc_metadata['section_level'] = section['level']
+                doc_metadata["section_title"] = section["title"]
+                doc_metadata["section_level"] = section["level"]
 
-                documents.append(Document(
-                    content=section_text,
-                    metadata=doc_metadata,
-                    chunk_id=f"{metadata.get('source', 'unknown')}_{section['title']}"
-                ))
+                documents.append(
+                    Document(
+                        content=section_text,
+                        metadata=doc_metadata,
+                        chunk_id=f"{metadata.get('source', 'unknown')}_{section['title']}",
+                    )
+                )
             else:
                 # Chunk large sections
                 section_metadata = metadata.copy()
-                section_metadata['section_title'] = section['title']
-                section_metadata['section_level'] = section['level']
+                section_metadata["section_title"] = section["title"]
+                section_metadata["section_level"] = section["level"]
 
                 chunked_docs = self.chunk_text(section_text, section_metadata)
                 documents.extend(chunked_docs)
@@ -213,13 +209,13 @@ class KubernetesDocProcessor:
 
     def process_file(self, file_path: Path) -> List[Document]:
         """Process a Kubernetes documentation file."""
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
 
         metadata = {
-            'source': str(file_path),
-            'filename': file_path.name,
-            'type': 'kubernetes_doc'
+            "source": str(file_path),
+            "filename": file_path.name,
+            "type": "kubernetes_doc",
         }
 
         # Extract Q&A pairs
@@ -233,16 +229,18 @@ class KubernetesDocProcessor:
         # Process Q&A pairs as individual documents
         for i, qa in enumerate(qa_pairs):
             qa_metadata = metadata.copy()
-            qa_metadata['type'] = 'qa_pair'
-            qa_metadata['question'] = qa['question']
+            qa_metadata["type"] = "qa_pair"
+            qa_metadata["question"] = qa["question"]
 
             qa_text = f"Question: {qa['question']}\n\nAnswer: {qa['answer']}"
 
-            documents.append(Document(
-                content=qa_text,
-                metadata=qa_metadata,
-                chunk_id=f"{file_path.stem}_qa_{i}"
-            ))
+            documents.append(
+                Document(
+                    content=qa_text,
+                    metadata=qa_metadata,
+                    chunk_id=f"{file_path.stem}_qa_{i}",
+                )
+            )
 
         # Process sections
         section_docs = self.chunker.chunk_by_section(sections, metadata)

@@ -53,27 +53,32 @@ A comprehensive Retrieval-Augmented Generation (RAG) system for Kubernetes learn
 ### Setup
 
 1. **Clone the repository**:
+
 ```bash
 cd kubernetes_rag
 ```
 
 2. **Create a virtual environment**:
+
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
 3. **Install dependencies**:
+
 ```bash
 pip install -r requirements.txt
 ```
 
 4. **Set up environment variables**:
+
 ```bash
 cp .env.example .env
 ```
 
 Edit `.env` and add your API keys:
+
 ```
 OPENAI_API_KEY=your_openai_api_key_here
 # or
@@ -81,6 +86,7 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here
 ```
 
 5. **Install the package**:
+
 ```bash
 pip install -e .
 ```
@@ -102,6 +108,7 @@ python -m src.cli ingest path/to/docs/ --file-pattern "*.md"
 ### 2. Query the System
 
 **Using CLI**:
+
 ```bash
 # Simple query
 python -m src.cli query "What is a Pod in Kubernetes?"
@@ -116,11 +123,13 @@ python -m src.cli interactive
 **Using REST API**:
 
 First, start the API server:
+
 ```bash
 python -m src.api
 ```
 
 Then query via HTTP:
+
 ```bash
 curl -X POST "http://localhost:8000/query" \
   -H "Content-Type: application/json" \
@@ -150,7 +159,7 @@ vector_db:
 
 # LLM Configuration
 llm:
-  provider: "openai"  # Options: openai, anthropic, local
+  provider: "openai" # Options: openai, anthropic, local
   model_name: "gpt-3.5-turbo"
   temperature: 0.3
   max_tokens: 1000
@@ -166,6 +175,7 @@ retrieval:
 ## CLI Commands
 
 ### Ingestion
+
 ```bash
 # Ingest documents
 python -m src.cli ingest <source> [--file-pattern PATTERN]
@@ -175,6 +185,7 @@ python -m src.cli ingest ./kubernetes_docs --file-pattern "*.md"
 ```
 
 ### Querying
+
 ```bash
 # Query with answer generation
 python -m src.cli query "Your question here"
@@ -187,11 +198,13 @@ python -m src.cli search "deployment" --category qa_pair
 ```
 
 ### Interactive Mode
+
 ```bash
 python -m src.cli interactive
 ```
 
 ### System Management
+
 ```bash
 # View statistics
 python -m src.cli stats
@@ -203,6 +216,7 @@ python -m src.cli reset --yes
 ## API Endpoints
 
 ### Query Endpoint
+
 ```http
 POST /query
 Content-Type: application/json
@@ -216,6 +230,7 @@ Content-Type: application/json
 ```
 
 ### Search Endpoint
+
 ```http
 POST /search
 Content-Type: application/json
@@ -229,6 +244,7 @@ Content-Type: application/json
 ```
 
 ### Ingest Endpoint
+
 ```http
 POST /ingest
 Content-Type: application/json
@@ -241,6 +257,7 @@ Content-Type: application/json
 ```
 
 ### Stats Endpoint
+
 ```http
 GET /stats
 ```
@@ -408,15 +425,18 @@ kubernetes_rag/
 ## Troubleshooting
 
 ### Issue: API key not found
+
 - Ensure `.env` file exists and contains valid API keys
 - Check environment variables are loaded correctly
 
 ### Issue: Slow embedding generation
+
 - Reduce batch size in config
 - Consider using a smaller embedding model
 - Enable GPU acceleration if available
 
 ### Issue: Poor retrieval quality
+
 - Increase `top_k` value
 - Enable re-ranking in config
 - Adjust `chunk_size` and `chunk_overlap`

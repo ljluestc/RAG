@@ -1,12 +1,13 @@
 """Vector store implementation using ChromaDB."""
 
-from typing import List, Dict, Any, Optional, Tuple
+import uuid
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
 import chromadb
+import numpy as np
 from chromadb.config import Settings
 from chromadb.utils import embedding_functions
-import numpy as np
-from pathlib import Path
-import uuid
 
 
 class VectorStore:
@@ -16,7 +17,7 @@ class VectorStore:
         self,
         collection_name: str = "kubernetes_docs",
         persist_directory: str = "./data/vector_db",
-        distance_metric: str = "cosine"
+        distance_metric: str = "cosine",
     ):
         """
         Initialize the vector store.
@@ -33,23 +34,16 @@ class VectorStore:
         # Initialize ChromaDB client
         self.client = chromadb.PersistentClient(
             path=str(self.persist_directory),
-            settings=Settings(
-                anonymized_telemetry=False,
-                allow_reset=True
-            )
+            settings=Settings(anonymized_telemetry=False, allow_reset=True),
         )
 
         # Create or get collection
         self.collection = self.client.get_or_create_collection(
-            name=collection_name,
-            metadata={"hnsw:space": distance_metric}
+            name=collection_name, metadata={"hnsw:space": distance_metric}
         )
 
     def add_documents(
-        self,
-        documents: List,
-        embeddings: np.ndarray,
-        batch_size: int = 100
+        self, documents: List, embeddings: np.ndarray, batch_size: int = 100
     ):
         """
         Add documents to the vector store.
@@ -62,8 +56,8 @@ class VectorStore:
         total_docs = len(documents)
 
         for i in range(0, total_docs, batch_size):
-            batch_docs = documents[i:i + batch_size]
-            batch_embeddings = embeddings[i:i + batch_size]
+            batch_docs = documents[i : i + batch_size]
+            batch_embeddings = embeddings[i : i + batch_size]
 
             ids = [doc.chunk_id for doc in batch_docs]
             texts = [doc.content for doc in batch_docs]
@@ -73,14 +67,14 @@ class VectorStore:
                 ids=ids,
                 embeddings=batch_embeddings.tolist(),
                 documents=texts,
-                metadatas=metadatas
+                metadatas=metadatas,
             )
 
     def search(
         self,
         query_embedding: np.ndarray,
         top_k: int = 5,
-        filter_dict: Optional[Dict[str, Any]] = None
+        filter_dict: Optional[Dict[str, Any]] = None,
     ) -> Tuple[List[str], List[Dict], List[float]]:
         """
         Search for similar documents.
@@ -96,12 +90,12 @@ class VectorStore:
         results = self.collection.query(
             query_embeddings=[query_embedding.tolist()],
             n_results=top_k,
-            where=filter_dict
+            where=filter_dict,
         )
 
-        documents = results['documents'][0]
-        metadatas = results['metadatas'][0]
-        distances = results['distances'][0]
+        documents = results["documents"][0]
+        metadatas = results["metadatas"][0]
+        distances = results["distances"][0]
 
         return documents, metadatas, distances
 
@@ -110,7 +104,7 @@ class VectorStore:
         query_text: str,
         embedding_generator,
         top_k: int = 5,
-        filter_dict: Optional[Dict[str, Any]] = None
+        filter_dict: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Search using text query.
@@ -126,18 +120,18 @@ class VectorStore:
         """
         query_embedding = embedding_generator.encode_query(query_text)
         documents, metadatas, distances = self.search(
-            query_embedding,
-            top_k=top_k,
-            filter_dict=filter_dict
+            query_embedding, top_k=top_k, filter_dict=filter_dict
         )
 
         results = []
         for doc, metadata, distance in zip(documents, metadatas, distances):
-            results.append({
-                'content': doc,
-                'metadata': metadata,
-                'score': 1 - distance  # Convert distance to similarity score
-            })
+            results.append(
+                {
+                    "content": doc,
+                    "metadata": metadata,
+                    "score": 1 - distance,  # Convert distance to similarity score
+                }
+            )
 
         return results
 
@@ -149,9 +143,9 @@ class VectorStore:
         """Get collection statistics."""
         count = self.collection.count()
         return {
-            'name': self.collection_name,
-            'count': count,
-            'persist_directory': str(self.persist_directory)
+            "name": self.collection_name,
+            "count": count,
+            "persist_directory": str(self.persist_directory),
         }
 
     def update_document(
@@ -159,14 +153,14 @@ class VectorStore:
         doc_id: str,
         embedding: np.ndarray,
         document: str,
-        metadata: Dict[str, Any]
+        metadata: Dict[str, Any],
     ):
         """Update a document in the collection."""
         self.collection.update(
             ids=[doc_id],
             embeddings=[embedding.tolist()],
             documents=[document],
-            metadatas=[metadata]
+            metadatas=[metadata],
         )
 
     def delete_documents(self, doc_ids: List[str]):
@@ -176,43 +170,32 @@ class VectorStore:
     def get_document(self, doc_id: str) -> Optional[Dict[str, Any]]:
         """Get a specific document by ID."""
         results = self.collection.get(
-            ids=[doc_id],
-            include=['embeddings', 'documents', 'metadatas']
+            ids=[doc_id], include=["embeddings", "documents", "metadatas"]
         )
 
-        if results['ids']:
+        if results["ids"]:
             return {
-                'id': results['ids'][0],
-                'content': results['documents'][0],
-                'metadata': results['metadatas'][0],
-                'embedding': results['embeddings'][0]
+                "id": results["ids"][0],
+                "content": results["documents"][0],
+                "metadata": results["metadatas"][0],
+                "embedding": results["embeddings"][0],
             }
 
         return None
 
     def list_all_documents(
-        self,
-        limit: Optional[int] = None,
-        offset: int = 0
+        self, limit: Optional[int] = None, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """List all documents in the collection."""
         results = self.collection.get(
-            limit=limit,
-            offset=offset,
-            include=['documents', 'metadatas']
+            limit=limit, offset=offset, include=["documents", "metadatas"]
         )
 
         documents = []
         for doc_id, content, metadata in zip(
-            results['ids'],
-            results['documents'],
-            results['metadatas']
+            results["ids"], results["documents"], results["metadatas"]
         ):
-            documents.append({
-                'id': doc_id,
-                'content': content,
-                'metadata': metadata
-            })
+            documents.append({"id": doc_id, "content": content, "metadata": metadata})
 
         return documents
 
@@ -223,11 +206,11 @@ class HybridVectorStore:
     def __init__(
         self,
         collection_name: str = "kubernetes_docs",
-        persist_directory: str = "./data/vector_db"
+        persist_directory: str = "./data/vector_db",
     ):
         self.dense_store = VectorStore(
             collection_name=f"{collection_name}_dense",
-            persist_directory=persist_directory
+            persist_directory=persist_directory,
         )
 
         # In a production system, you might use a separate store for sparse vectors
@@ -243,7 +226,7 @@ class HybridVectorStore:
         query_text: str,
         top_k: int = 5,
         dense_weight: float = 0.7,
-        sparse_weight: float = 0.3
+        sparse_weight: float = 0.3,
     ) -> List[Dict[str, Any]]:
         """
         Perform hybrid search combining dense and sparse retrieval.
@@ -260,8 +243,7 @@ class HybridVectorStore:
         """
         # Get dense results
         dense_docs, dense_metas, dense_dists = self.dense_store.search(
-            query_embedding,
-            top_k=top_k * 2  # Get more results for reranking
+            query_embedding, top_k=top_k * 2  # Get more results for reranking
         )
 
         # Simple keyword matching for sparse component
@@ -276,19 +258,25 @@ class HybridVectorStore:
 
         # Combine scores
         combined_results = []
-        for i, (doc, meta, dense_dist) in enumerate(zip(dense_docs, dense_metas, dense_dists)):
+        for i, (doc, meta, dense_dist) in enumerate(
+            zip(dense_docs, dense_metas, dense_dists)
+        ):
             dense_score = 1 - dense_dist
             sparse_score = sparse_scores[i]
-            combined_score = (dense_weight * dense_score) + (sparse_weight * sparse_score)
+            combined_score = (dense_weight * dense_score) + (
+                sparse_weight * sparse_score
+            )
 
-            combined_results.append({
-                'content': doc,
-                'metadata': meta,
-                'score': combined_score,
-                'dense_score': dense_score,
-                'sparse_score': sparse_score
-            })
+            combined_results.append(
+                {
+                    "content": doc,
+                    "metadata": meta,
+                    "score": combined_score,
+                    "dense_score": dense_score,
+                    "sparse_score": sparse_score,
+                }
+            )
 
         # Sort by combined score and return top_k
-        combined_results.sort(key=lambda x: x['score'], reverse=True)
+        combined_results.sort(key=lambda x: x["score"], reverse=True)
         return combined_results[:top_k]

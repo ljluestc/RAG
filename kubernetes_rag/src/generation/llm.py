@@ -1,8 +1,8 @@
 """LLM integration for answer generation."""
 
-from typing import List, Dict, Any, Optional
-from abc import ABC, abstractmethod
 import os
+from abc import ABC, abstractmethod
+from typing import Any, Dict, List, Optional
 
 from ..utils.logger import get_logger
 
@@ -14,10 +14,7 @@ class LLMBase(ABC):
 
     @abstractmethod
     def generate(
-        self,
-        prompt: str,
-        temperature: float = 0.3,
-        max_tokens: int = 1000
+        self, prompt: str, temperature: float = 0.3, max_tokens: int = 1000
     ) -> str:
         """Generate text from prompt."""
         pass
@@ -38,21 +35,21 @@ class OpenAILLM(LLMBase):
         self.model = model
 
     def generate(
-        self,
-        prompt: str,
-        temperature: float = 0.3,
-        max_tokens: int = 1000
+        self, prompt: str, temperature: float = 0.3, max_tokens: int = 1000
     ) -> str:
         """Generate text using OpenAI."""
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a helpful Kubernetes expert assistant."},
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system",
+                        "content": "You are a helpful Kubernetes expert assistant.",
+                    },
+                    {"role": "user", "content": prompt},
                 ],
                 temperature=temperature,
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
             )
 
             return response.choices[0].message.content
@@ -65,7 +62,9 @@ class OpenAILLM(LLMBase):
 class AnthropicLLM(LLMBase):
     """Anthropic Claude LLM provider."""
 
-    def __init__(self, api_key: Optional[str] = None, model: str = "claude-3-sonnet-20240229"):
+    def __init__(
+        self, api_key: Optional[str] = None, model: str = "claude-3-sonnet-20240229"
+    ):
         """Initialize Anthropic LLM."""
         import anthropic
 
@@ -77,10 +76,7 @@ class AnthropicLLM(LLMBase):
         self.model = model
 
     def generate(
-        self,
-        prompt: str,
-        temperature: float = 0.3,
-        max_tokens: int = 1000
+        self, prompt: str, temperature: float = 0.3, max_tokens: int = 1000
     ) -> str:
         """Generate text using Anthropic."""
         try:
@@ -88,9 +84,7 @@ class AnthropicLLM(LLMBase):
                 model=self.model,
                 max_tokens=max_tokens,
                 temperature=temperature,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
+                messages=[{"role": "user", "content": prompt}],
             )
 
             return message.content[0].text
@@ -109,10 +103,7 @@ class LocalLLM(LLMBase):
         logger.warning("Local LLM is not fully implemented yet")
 
     def generate(
-        self,
-        prompt: str,
-        temperature: float = 0.3,
-        max_tokens: int = 1000
+        self, prompt: str, temperature: float = 0.3, max_tokens: int = 1000
     ) -> str:
         """Generate text using local model."""
         # This is a placeholder - implement with transformers or llama.cpp
@@ -137,7 +128,7 @@ class RAGGenerator:
         retrieved_docs: List[Dict[str, Any]],
         temperature: float = 0.3,
         max_tokens: int = 1000,
-        include_sources: bool = True
+        include_sources: bool = True,
     ) -> Dict[str, Any]:
         """
         Generate answer using retrieved documents.
@@ -162,23 +153,17 @@ class RAGGenerator:
 
         # Generate answer
         answer = self.llm.generate(
-            prompt,
-            temperature=temperature,
-            max_tokens=max_tokens
+            prompt, temperature=temperature, max_tokens=max_tokens
         )
 
-        result = {
-            'query': query,
-            'answer': answer,
-            'num_sources': len(retrieved_docs)
-        }
+        result = {"query": query, "answer": answer, "num_sources": len(retrieved_docs)}
 
         if include_sources:
-            result['sources'] = [
+            result["sources"] = [
                 {
-                    'content': doc['content'][:200] + '...',
-                    'metadata': doc['metadata'],
-                    'score': doc.get('score', 0.0)
+                    "content": doc["content"][:200] + "...",
+                    "metadata": doc["metadata"],
+                    "score": doc.get("score", 0.0),
                 }
                 for doc in retrieved_docs
             ]
@@ -190,8 +175,8 @@ class RAGGenerator:
         context_parts = []
 
         for i, doc in enumerate(retrieved_docs, 1):
-            content = doc['content']
-            score = doc.get('score', 0.0)
+            content = doc["content"]
+            score = doc.get("score", 0.0)
 
             context_parts.append(
                 f"[Document {i}] (Relevance: {score:.2f})\n{content}\n"
@@ -223,7 +208,7 @@ Answer:"""
         self,
         query: str,
         retrieved_docs: List[Dict[str, Any]],
-        conversation_history: List[Dict[str, str]] = None
+        conversation_history: List[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
         """
         Generate answer with conversation history.
@@ -244,42 +229,31 @@ Answer:"""
 
         # Create prompt with history
         prompt = self._create_conversational_prompt(
-            query,
-            context,
-            conversation_history
+            query, context, conversation_history
         )
 
         # Generate answer
         answer = self.llm.generate(prompt)
 
         # Update history
-        conversation_history.append({
-            'role': 'user',
-            'content': query
-        })
-        conversation_history.append({
-            'role': 'assistant',
-            'content': answer
-        })
+        conversation_history.append({"role": "user", "content": query})
+        conversation_history.append({"role": "assistant", "content": answer})
 
         return {
-            'query': query,
-            'answer': answer,
-            'conversation_history': conversation_history,
-            'sources': retrieved_docs
+            "query": query,
+            "answer": answer,
+            "conversation_history": conversation_history,
+            "sources": retrieved_docs,
         }
 
     def _create_conversational_prompt(
-        self,
-        query: str,
-        context: str,
-        history: List[Dict[str, str]]
+        self, query: str, context: str, history: List[Dict[str, str]]
     ) -> str:
         """Create conversational prompt with history."""
         history_text = ""
         for turn in history[-3:]:  # Last 3 turns
-            role = turn['role'].capitalize()
-            content = turn['content']
+            role = turn["role"].capitalize()
+            content = turn["content"]
             history_text += f"{role}: {content}\n\n"
 
         prompt = f"""You are a Kubernetes expert assistant engaged in a conversation.
@@ -330,9 +304,6 @@ def create_rag_generator(config: dict) -> RAGGenerator:
     Returns:
         RAGGenerator instance
     """
-    llm = create_llm(
-        provider=config.llm.provider,
-        model=config.llm.model_name
-    )
+    llm = create_llm(provider=config.llm.provider, model=config.llm.model_name)
 
     return RAGGenerator(llm=llm)

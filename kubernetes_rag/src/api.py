@@ -1,16 +1,17 @@
 """FastAPI REST API for Kubernetes RAG system."""
 
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
-from pathlib import Path
 
-from .utils.config_loader import get_config
-from .utils.logger import setup_logger, get_logger
+from .generation.llm import create_rag_generator
 from .ingestion.pipeline import create_ingestion_pipeline
 from .retrieval.retriever import create_retriever
-from .generation.llm import create_rag_generator
+from .utils.config_loader import get_config
+from .utils.logger import get_logger, setup_logger
 
 # Initialize
 config, settings = get_config()
@@ -21,7 +22,7 @@ logger = get_logger()
 app = FastAPI(
     title="Kubernetes RAG API",
     description="RAG system for Kubernetes learning and testing",
-    version="0.1.0"
+    version="0.1.0",
 )
 
 # Add CORS middleware
@@ -43,8 +44,12 @@ pipeline = create_ingestion_pipeline(config)
 class QueryRequest(BaseModel):
     query: str = Field(..., description="The question or query")
     top_k: int = Field(default=5, description="Number of documents to retrieve")
-    generate_answer: bool = Field(default=True, description="Whether to generate an answer")
-    temperature: float = Field(default=0.3, ge=0.0, le=2.0, description="LLM temperature")
+    generate_answer: bool = Field(
+        default=True, description="Whether to generate an answer"
+    )
+    temperature: float = Field(
+        default=0.3, ge=0.0, le=2.0, description="LLM temperature"
+    )
 
 
 class SearchRequest(BaseModel):
@@ -56,7 +61,9 @@ class SearchRequest(BaseModel):
 
 class IngestRequest(BaseModel):
     text: str = Field(..., description="Text to ingest")
-    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Optional metadata")
+    metadata: Optional[Dict[str, Any]] = Field(
+        default=None, description="Optional metadata"
+    )
     source_name: str = Field(default="api_upload", description="Source identifier")
 
 
@@ -94,19 +101,13 @@ class HealthResponse(BaseModel):
 @app.get("/", response_model=HealthResponse)
 async def root():
     """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "version": "0.1.0"
-    }
+    return {"status": "healthy", "version": "0.1.0"}
 
 
 @app.get("/health", response_model=HealthResponse)
 async def health():
     """Detailed health check."""
-    return {
-        "status": "healthy",
-        "version": "0.1.0"
-    }
+    return {"status": "healthy", "version": "0.1.0"}
 
 
 @app.post("/query", response_model=QueryResponse)
@@ -120,10 +121,7 @@ async def query_endpoint(request: QueryRequest):
         logger.info(f"Received query: {request.query}")
 
         # Retrieve documents
-        results = retriever.retrieve(
-            request.query,
-            top_k=request.top_k
-        )
+        results = retriever.retrieve(request.query, top_k=request.top_k)
 
         if not results:
             raise HTTPException(status_code=404, detail="No relevant documents found")
@@ -131,9 +129,9 @@ async def query_endpoint(request: QueryRequest):
         # Prepare response
         documents = [
             DocumentResponse(
-                content=doc['content'],
-                metadata=doc['metadata'],
-                score=doc.get('score', 0.0)
+                content=doc["content"],
+                metadata=doc["metadata"],
+                score=doc.get("score", 0.0),
             )
             for doc in results
         ]
@@ -141,17 +139,15 @@ async def query_endpoint(request: QueryRequest):
         response = {
             "query": request.query,
             "documents": documents,
-            "num_sources": len(results)
+            "num_sources": len(results),
         }
 
         # Generate answer if requested
         if request.generate_answer:
             answer_data = generator.generate_answer(
-                request.query,
-                results,
-                temperature=request.temperature
+                request.query, results, temperature=request.temperature
             )
-            response["answer"] = answer_data['answer']
+            response["answer"] = answer_data["answer"]
 
         return response
 
@@ -171,23 +167,21 @@ async def search_endpoint(request: SearchRequest):
         # Search
         if request.category:
             results = retriever.retrieve_by_category(
-                request.query,
-                request.category,
-                top_k=request.top_k
+                request.query, request.category, top_k=request.top_k
             )
         else:
             results = retriever.retrieve(
                 request.query,
                 top_k=request.top_k,
-                score_threshold=request.score_threshold
+                score_threshold=request.score_threshold,
             )
 
         # Prepare response
         documents = [
             DocumentResponse(
-                content=doc['content'],
-                metadata=doc['metadata'],
-                score=doc.get('score', 0.0)
+                content=doc["content"],
+                metadata=doc["metadata"],
+                score=doc.get("score", 0.0),
             )
             for doc in results
         ]
@@ -195,7 +189,7 @@ async def search_endpoint(request: SearchRequest):
         return {
             "query": request.query,
             "results": documents,
-            "total_results": len(results)
+            "total_results": len(results),
         }
 
     except Exception as e:
@@ -212,15 +206,13 @@ async def ingest_endpoint(request: IngestRequest):
         logger.info(f"Ingesting text from: {request.source_name}")
 
         num_chunks = pipeline.ingest_from_text(
-            request.text,
-            metadata=request.metadata,
-            source_name=request.source_name
+            request.text, metadata=request.metadata, source_name=request.source_name
         )
 
         return {
             "status": "success",
             "chunks_created": num_chunks,
-            "source_name": request.source_name
+            "source_name": request.source_name,
         }
 
     except Exception as e:
@@ -238,15 +230,15 @@ async def stats_endpoint():
 
         vector_store = VectorStore(
             collection_name=config.vector_db.collection_name,
-            persist_directory=config.vector_db.persist_directory
+            persist_directory=config.vector_db.persist_directory,
         )
 
         stats = vector_store.get_collection_stats()
 
         return {
-            "collection_name": stats['name'],
-            "document_count": stats['count'],
-            "persist_directory": stats['persist_directory']
+            "collection_name": stats["name"],
+            "document_count": stats["count"],
+            "persist_directory": stats["persist_directory"],
         }
 
     except Exception as e:
@@ -264,13 +256,13 @@ async def categories_endpoint():
             {
                 "id": "qa_pair",
                 "name": "Q&A Pairs",
-                "description": "Question and answer pairs from documentation"
+                "description": "Question and answer pairs from documentation",
             },
             {
                 "id": "kubernetes_doc",
                 "name": "Kubernetes Documentation",
-                "description": "General Kubernetes documentation sections"
-            }
+                "description": "General Kubernetes documentation sections",
+            },
         ]
     }
 
@@ -280,8 +272,5 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "api:app",
-        host=config.api.host,
-        port=config.api.port,
-        reload=config.api.reload
+        "api:app", host=config.api.host, port=config.api.port, reload=config.api.reload
     )

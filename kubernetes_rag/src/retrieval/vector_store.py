@@ -280,3 +280,33 @@ class HybridVectorStore:
         # Sort by combined score and return top_k
         combined_results.sort(key=lambda x: x["score"], reverse=True)
         return combined_results[:top_k]
+
+
+def create_vector_store(
+    collection_name: str = "kubernetes_docs",
+    persist_directory: str = "./data/vector_db",
+    distance_metric: str = "cosine",
+    hybrid: bool = False,
+):
+    """
+    Factory function to create a vector store.
+
+    Args:
+        collection_name: Name of the collection
+        persist_directory: Directory to persist the database
+        distance_metric: Distance metric (cosine, l2, ip)
+        hybrid: Whether to use hybrid vector store
+
+    Returns:
+        VectorStore or HybridVectorStore instance
+    """
+    if hybrid:
+        return HybridVectorStore(
+            collection_name=collection_name, persist_directory=persist_directory
+        )
+    else:
+        return VectorStore(
+            collection_name=collection_name,
+            persist_directory=persist_directory,
+            distance_metric=distance_metric,
+        )

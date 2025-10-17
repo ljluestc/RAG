@@ -1,357 +1,373 @@
 """Comprehensive test suite for utils module to achieve 100% coverage."""
 
 import os
-import shutil
 import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+import yaml
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from src.utils.config_loader import Config, Settings, get_config
+from src.utils.config_loader import Config, Settings, get_config, load_config
 from src.utils.logger import get_logger, setup_logger
 
 
-class TestConfigLoader:
-    """Test configuration loader functionality."""
+class TestConfig:
+    """Test Config class."""
 
-    def test_config_initialization(self):
-        """Test Config class initialization."""
-        config = Config()
-
-        # Test default values
-        assert hasattr(config, "embedding")
-        assert hasattr(config, "vector_db")
-        assert hasattr(config, "llm")
-        assert hasattr(config, "retrieval")
-
-    def test_settings_initialization(self):
-        """Test Settings class initialization."""
-        settings = Settings()
-
-        # Test default values
-        assert hasattr(settings, "openai_api_key")
-        assert hasattr(settings, "anthropic_api_key")
-
-    @patch("src.utils.config_loader.yaml.safe_load")
-    @patch("builtins.open")
-    def test_get_config_success(self, mock_open, mock_yaml_load):
-        """Test successful config loading."""
-        # Mock YAML content
-        mock_yaml_content = {
-            "embedding": {
-                "model_name": "test-model",
-                "embedding_dim": 384,
-                "batch_size": 32,
-            },
-            "vector_db": {
-                "type": "chromadb",
-                "persist_directory": "./data/vector_db",
-                "collection_name": "test_collection",
-            },
+    def test_config_init(self):
+        """Test Config initialization."""
+        config_data = {
             "llm": {
                 "provider": "openai",
                 "model_name": "gpt-3.5-turbo",
-                "temperature": 0.3,
+                "temperature": 0.7,
                 "max_tokens": 1000,
             },
-            "retrieval": {
-                "top_k": 5,
-                "score_threshold": 0.7,
-                "rerank": True,
-                "rerank_top_k": 3,
+            "embeddings": {
+                "provider": "openai",
+                "model_name": "text-embedding-ada-002",
             },
+            "vector_store": {
+                "type": "chroma",
+                "collection_name": "test_collection",
+                "persist_directory": "/tmp/test",
+            },
+            "retrieval": {"top_k": 5, "similarity_threshold": 0.7},
         }
 
-        mock_yaml_load.return_value = mock_yaml_content
-        mock_open.return_value.__enter__.return_value.read.return_value = "test yaml"
+        config = Config(**config_data)
 
-        config, settings = get_config()
-
-        assert config is not None
-        assert settings is not None
-        assert config.embedding.model_name == "test-model"
-
-    @patch("src.utils.config_loader.yaml.safe_load")
-    @patch("builtins.open")
-    def test_get_config_file_not_found(self, mock_open, mock_yaml_load):
-        """Test config loading when file is not found."""
-        mock_open.side_effect = FileNotFoundError("Config file not found")
-
-        config, settings = get_config()
-
-        # Should return default config
-        assert config is not None
-        assert settings is not None
-
-    @patch("src.utils.config_loader.yaml.safe_load")
-    @patch("builtins.open")
-    def test_get_config_yaml_error(self, mock_open, mock_yaml_load):
-        """Test config loading with YAML parsing error."""
-        mock_yaml_load.side_effect = Exception("YAML parsing error")
-        mock_open.return_value.__enter__.return_value.read.return_value = "invalid yaml"
-
-        config, settings = get_config()
-
-        # Should return default config
-        assert config is not None
-        assert settings is not None
-
-    def test_config_attributes(self):
-        """Test config attributes and their types."""
-        config = Config()
-
-        # Test embedding config
-        assert hasattr(config.embedding, "model_name")
-        assert hasattr(config.embedding, "embedding_dim")
-        assert hasattr(config.embedding, "batch_size")
-
-        # Test vector_db config
-        assert hasattr(config.vector_db, "type")
-        assert hasattr(config.vector_db, "persist_directory")
-        assert hasattr(config.vector_db, "collection_name")
-
-        # Test llm config
-        assert hasattr(config.llm, "provider")
-        assert hasattr(config.llm, "model_name")
-        assert hasattr(config.llm, "temperature")
-        assert hasattr(config.llm, "max_tokens")
-
-        # Test retrieval config
-        assert hasattr(config.retrieval, "top_k")
-        assert hasattr(config.retrieval, "score_threshold")
-        assert hasattr(config.retrieval, "rerank")
-        assert hasattr(config.retrieval, "rerank_top_k")
-
-    def test_settings_environment_variables(self):
-        """Test settings environment variable handling."""
-        settings = Settings()
-
-        # Test that settings can handle missing environment variables
-        assert settings.openai_api_key is None or isinstance(
-            settings.openai_api_key, str
-        )
-        assert settings.anthropic_api_key is None or isinstance(
-            settings.anthropic_api_key, str
-        )
-
-
-class TestLogger:
-    """Test logger functionality."""
-
-    def test_setup_logger(self):
-        """Test logger setup."""
-        logger = setup_logger("test_logger")
-
-        assert logger is not None
-        assert logger.name == "test_logger"
-
-    def test_get_logger(self):
-        """Test getting existing logger."""
-        logger = get_logger("test_logger")
-
-        assert logger is not None
-        assert logger.name == "test_logger"
-
-    def test_logger_levels(self):
-        """Test logger levels."""
-        logger = setup_logger("test_logger_levels")
-
-        # Test that logger has standard levels
-        assert hasattr(logger, "debug")
-        assert hasattr(logger, "info")
-        assert hasattr(logger, "warning")
-        assert hasattr(logger, "error")
-        assert hasattr(logger, "critical")
-
-    def test_logger_formatting(self):
-        """Test logger formatting."""
-        logger = setup_logger("test_logger_formatting")
-
-        # Test that logger can format messages
-        test_message = "Test message"
-        formatted_message = logger.format(test_message)
-
-        assert isinstance(formatted_message, str)
-        assert len(formatted_message) > 0
-
-    def test_logger_handlers(self):
-        """Test logger handlers."""
-        logger = setup_logger("test_logger_handlers")
-
-        # Test that logger has handlers
-        assert len(logger.handlers) > 0
-
-        # Test handler types
-        for handler in logger.handlers:
-            assert hasattr(handler, "emit")
-            assert hasattr(handler, "format")
-
-
-class TestEdgeCases:
-    """Test edge cases and error conditions."""
-
-    def test_config_with_missing_sections(self):
-        """Test config handling with missing sections."""
-        config = Config()
-
-        # Should handle missing sections gracefully
-        assert config is not None
-        assert hasattr(config, "embedding")
-        assert hasattr(config, "vector_db")
-        assert hasattr(config, "llm")
-        assert hasattr(config, "retrieval")
-
-    def test_settings_with_invalid_env_vars(self):
-        """Test settings with invalid environment variables."""
-        settings = Settings()
-
-        # Should handle invalid environment variables gracefully
-        assert settings is not None
-        assert isinstance(settings.openai_api_key, (str, type(None)))
-        assert isinstance(settings.anthropic_api_key, (str, type(None)))
-
-    def test_logger_with_special_characters(self):
-        """Test logger with special characters."""
-        logger = setup_logger("test_logger_special_chars")
-
-        # Test logging messages with special characters
-        special_messages = [
-            "Test message with émojis 🚀",
-            "Test message with unicode: 中文",
-            "Test message with symbols: @#$%^&*()",
-            "Test message with newlines:\nLine 2\nLine 3",
-        ]
-
-        for message in special_messages:
-            # Should handle special characters without errors
-            assert isinstance(message, str)
-            assert len(message) > 0
+        assert config.llm.provider == "openai"
+        assert config.llm.model_name == "gpt-3.5-turbo"
+        assert config.embeddings.provider == "openai"
+        assert config.vector_store.type == "chroma"
+        assert config.retrieval.top_k == 5
 
     def test_config_validation(self):
-        """Test config validation."""
+        """Test Config validation."""
+        with pytest.raises(ValueError):
+            Config(llm={"provider": "invalid"})
+
+    def test_config_defaults(self):
+        """Test Config with default values."""
         config = Config()
 
-        # Test that config values are within expected ranges
-        assert config.embedding.embedding_dim > 0
-        assert config.embedding.batch_size > 0
-        assert config.llm.temperature >= 0.0
-        assert config.llm.temperature <= 2.0
-        assert config.llm.max_tokens > 0
-        assert config.retrieval.top_k > 0
-        assert config.retrieval.score_threshold >= 0.0
-        assert config.retrieval.score_threshold <= 1.0
-        assert config.retrieval.rerank_top_k > 0
+        assert config.llm.provider == "openai"
+        assert config.llm.temperature == 0.7
+        assert config.retrieval.top_k == 5
 
 
-class TestPerformance:
-    """Test performance aspects."""
+class TestSettings:
+    """Test Settings class."""
+
+    def test_settings_init(self):
+        """Test Settings initialization."""
+        settings = Settings()
+
+        assert settings.log_level == "INFO"
+        assert settings.debug == False
+
+    def test_settings_from_env(self):
+        """Test Settings from environment variables."""
+        with patch.dict(os.environ, {"LOG_LEVEL": "DEBUG", "DEBUG": "true"}):
+            settings = Settings()
+
+            assert settings.log_level == "DEBUG"
+            assert settings.debug == True
+
+
+class TestLoadConfig:
+    """Test load_config function."""
+
+    def test_load_config_from_file(self):
+        """Test loading config from file."""
+        config_data = {
+            "llm": {
+                "provider": "openai",
+                "model_name": "gpt-3.5-turbo",
+                "temperature": 0.7,
+                "max_tokens": 1000,
+            },
+            "embeddings": {
+                "provider": "openai",
+                "model_name": "text-embedding-ada-002",
+            },
+            "vector_store": {
+                "type": "chroma",
+                "collection_name": "test_collection",
+                "persist_directory": "/tmp/test",
+            },
+            "retrieval": {"top_k": 5, "similarity_threshold": 0.7},
+        }
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            yaml.dump(config_data, f)
+            f.flush()
+
+            try:
+                config, settings = load_config(f.name)
+
+                assert isinstance(config, Config)
+                assert isinstance(settings, Settings)
+                assert config.llm.provider == "openai"
+            finally:
+                os.unlink(f.name)
+
+    def test_load_config_default(self):
+        """Test loading default config."""
+        config, settings = load_config()
+
+        assert isinstance(config, Config)
+        assert isinstance(settings, Settings)
+
+    def test_load_config_invalid_file(self):
+        """Test loading config from invalid file."""
+        with pytest.raises(FileNotFoundError):
+            load_config("non_existent_file.yaml")
+
+    def test_load_config_invalid_yaml(self):
+        """Test loading config from invalid YAML file."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write("invalid: yaml: content: [")
+            f.flush()
+
+            try:
+                with pytest.raises(yaml.YAMLError):
+                    load_config(f.name)
+            finally:
+                os.unlink(f.name)
+
+
+class TestGetConfig:
+    """Test get_config function."""
+
+    def test_get_config(self):
+        """Test get_config function."""
+        with patch("src.utils.config_loader.load_config") as mock_load_config:
+            mock_config = Mock()
+            mock_settings = Mock()
+            mock_load_config.return_value = (mock_config, mock_settings)
+
+            config, settings = get_config()
+
+            assert config == mock_config
+            assert settings == mock_settings
+            mock_load_config.assert_called_once()
+
+
+class TestSetupLogger:
+    """Test setup_logger function."""
+
+    def test_setup_logger_default(self):
+        """Test setup_logger with default parameters."""
+        with patch("loguru.logger") as mock_logger:
+            setup_logger()
+
+            # Should not raise any exceptions
+            assert True
+
+    def test_setup_logger_custom_level(self):
+        """Test setup_logger with custom log level."""
+        with patch("loguru.logger") as mock_logger:
+            setup_logger(log_level="DEBUG")
+
+            # Should not raise any exceptions
+            assert True
+
+    def test_setup_logger_with_file(self):
+        """Test setup_logger with file output."""
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            try:
+                with patch("loguru.logger") as mock_logger:
+                    setup_logger(log_file=f.name)
+
+                    # Should not raise any exceptions
+                    assert True
+            finally:
+                os.unlink(f.name)
+
+    def test_setup_logger_remove_existing(self):
+        """Test setup_logger removes existing handlers."""
+        with patch("loguru.logger") as mock_logger:
+            mock_logger.remove.return_value = None
+            mock_logger.add.return_value = None
+
+            setup_logger()
+
+            mock_logger.remove.assert_called_once()
+
+
+class TestGetLogger:
+    """Test get_logger function."""
+
+    def test_get_logger(self):
+        """Test get_logger function."""
+        with patch("loguru.logger") as mock_logger:
+            logger = get_logger()
+
+            assert logger == mock_logger
+
+
+@pytest.mark.unit
+class TestUtilsEdgeCases:
+    """Test edge cases for utils module."""
+
+    def test_config_missing_required_fields(self):
+        """Test Config with missing required fields."""
+        with pytest.raises(ValueError):
+            Config(llm={})
+
+    def test_config_invalid_llm_provider(self):
+        """Test Config with invalid LLM provider."""
+        with pytest.raises(ValueError):
+            Config(llm={"provider": "invalid_provider"})
+
+    def test_config_invalid_embeddings_provider(self):
+        """Test Config with invalid embeddings provider."""
+        with pytest.raises(ValueError):
+            Config(embeddings={"provider": "invalid_provider"})
+
+    def test_config_invalid_vector_store_type(self):
+        """Test Config with invalid vector store type."""
+        with pytest.raises(ValueError):
+            Config(vector_store={"type": "invalid_type"})
+
+    def test_settings_invalid_log_level(self):
+        """Test Settings with invalid log level."""
+        with patch.dict(os.environ, {"LOG_LEVEL": "INVALID"}):
+            settings = Settings()
+            # Should use default value
+            assert settings.log_level == "INFO"
+
+    def test_load_config_empty_file(self):
+        """Test loading config from empty file."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write("")
+            f.flush()
+
+            try:
+                with pytest.raises(ValueError):
+                    load_config(f.name)
+            finally:
+                os.unlink(f.name)
+
+    def test_load_config_malformed_yaml(self):
+        """Test loading config from malformed YAML."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write(
+                "llm:\n  provider: openai\n  model_name: gpt-3.5-turbo\ninvalid_field: value"
+            )
+            f.flush()
+
+            try:
+                with pytest.raises(ValueError):
+                    load_config(f.name)
+            finally:
+                os.unlink(f.name)
+
+
+@pytest.mark.integration
+class TestUtilsIntegration:
+    """Test integration scenarios for utils module."""
+
+    def test_config_and_settings_integration(self):
+        """Test Config and Settings integration."""
+        config_data = {
+            "llm": {
+                "provider": "openai",
+                "model_name": "gpt-3.5-turbo",
+                "temperature": 0.7,
+                "max_tokens": 1000,
+            },
+            "embeddings": {
+                "provider": "openai",
+                "model_name": "text-embedding-ada-002",
+            },
+            "vector_store": {
+                "type": "chroma",
+                "collection_name": "test_collection",
+                "persist_directory": "/tmp/test",
+            },
+            "retrieval": {"top_k": 5, "similarity_threshold": 0.7},
+        }
+
+        config = Config(**config_data)
+        settings = Settings()
+
+        # Test that config and settings work together
+        assert config.llm.provider == "openai"
+        assert settings.log_level == "INFO"
+
+    def test_logger_integration(self):
+        """Test logger integration with config."""
+        with patch("loguru.logger") as mock_logger:
+            setup_logger(log_level="DEBUG")
+
+            logger = get_logger()
+            logger.info("Test message")
+
+            # Should not raise any exceptions
+            assert True
+
+
+@pytest.mark.slow
+class TestUtilsPerformance:
+    """Test performance scenarios for utils module."""
 
     def test_config_loading_performance(self):
         """Test config loading performance."""
         import time
 
-        start_time = time.time()
-        config, settings = get_config()
-        end_time = time.time()
+        config_data = {
+            "llm": {
+                "provider": "openai",
+                "model_name": "gpt-3.5-turbo",
+                "temperature": 0.7,
+                "max_tokens": 1000,
+            },
+            "embeddings": {
+                "provider": "openai",
+                "model_name": "text-embedding-ada-002",
+            },
+            "vector_store": {
+                "type": "chroma",
+                "collection_name": "test_collection",
+                "persist_directory": "/tmp/test",
+            },
+            "retrieval": {"top_k": 5, "similarity_threshold": 0.7},
+        }
 
-        # Should load quickly (less than 1 second)
-        assert (end_time - start_time) < 1.0
-        assert config is not None
-        assert settings is not None
+        start_time = time.time()
+
+        for _ in range(100):
+            config = Config(**config_data)
+
+        end_time = time.time()
+        duration = end_time - start_time
+
+        # Should complete in reasonable time (less than 1 second for 100 iterations)
+        assert duration < 1.0
 
     def test_logger_performance(self):
         """Test logger performance."""
         import time
 
-        logger = setup_logger("test_logger_performance")
+        with patch("loguru.logger") as mock_logger:
+            setup_logger()
+            logger = get_logger()
 
-        start_time = time.time()
-        for i in range(100):
-            logger.info(f"Test message {i}")
-        end_time = time.time()
+            start_time = time.time()
 
-        # Should log quickly (less than 1 second for 100 messages)
-        assert (end_time - start_time) < 1.0
+            for _ in range(1000):
+                logger.info("Test message")
 
-    def test_memory_usage(self):
-        """Test memory usage."""
-        import sys
+            end_time = time.time()
+            duration = end_time - start_time
 
-        initial_size = sys.getsizeof({})
-
-        # Create multiple configs and loggers
-        configs = [Config() for _ in range(10)]
-        loggers = [setup_logger(f"test_logger_{i}") for i in range(10)]
-
-        final_size = sys.getsizeof({})
-
-        # Memory usage should be reasonable
-        assert len(configs) == 10
-        assert len(loggers) == 10
-
-
-class TestIntegration:
-    """Test integration scenarios."""
-
-    def test_config_and_logger_integration(self):
-        """Test integration between config and logger."""
-        config, settings = get_config()
-        logger = setup_logger("test_integration")
-
-        # Test that they work together
-        logger.info("Config loaded successfully")
-        assert config is not None
-        assert settings is not None
-        assert logger is not None
-
-    def test_multiple_loggers(self):
-        """Test multiple loggers working together."""
-        loggers = [
-            setup_logger("test_logger_1"),
-            setup_logger("test_logger_2"),
-            setup_logger("test_logger_3"),
-        ]
-
-        # Test that all loggers work
-        for i, logger in enumerate(loggers):
-            logger.info(f"Test message from logger {i}")
-            assert logger is not None
-            assert logger.name == f"test_logger_{i+1}"
-
-    def test_config_reloading(self):
-        """Test config reloading."""
-        config1, settings1 = get_config()
-        config2, settings2 = get_config()
-
-        # Should be able to reload config multiple times
-        assert config1 is not None
-        assert config2 is not None
-        assert settings1 is not None
-        assert settings2 is not None
-
-
-# Test markers for pytest
-@pytest.mark.unit
-class TestUnitUtils(TestConfigLoader, TestLogger):
-    """Unit tests for utils module."""
-
-    pass
-
-
-@pytest.mark.integration
-class TestIntegrationUtils(TestIntegration):
-    """Integration tests for utils module."""
-
-    pass
-
-
-@pytest.mark.slow
-class TestSlowUtils(TestPerformance):
-    """Slow tests for utils module."""
-
-    pass
+            # Should complete in reasonable time (less than 1 second for 1000 messages)
+            assert duration < 1.0

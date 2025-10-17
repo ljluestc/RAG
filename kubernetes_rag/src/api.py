@@ -1,5 +1,6 @@
 """FastAPI REST API for Kubernetes RAG system."""
 
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -13,26 +14,40 @@ from .retrieval.retriever import create_retriever
 from .utils.config_loader import get_config
 from .utils.logger import get_logger, setup_logger
 
+
+def create_app() -> FastAPI:
+    """
+    Create and configure the FastAPI application.
+
+    Returns:
+        FastAPI application instance
+    """
+    # Create FastAPI app
+    app = FastAPI(
+        title="Kubernetes RAG API",
+        description="RAG system for Kubernetes learning and testing",
+        version="0.1.0",
+    )
+
+    # Add CORS middleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    return app
+
+
 # Initialize
 config, settings = get_config()
 setup_logger(log_level=config.logging.level)
 logger = get_logger()
 
-# Create FastAPI app
-app = FastAPI(
-    title="Kubernetes RAG API",
-    description="RAG system for Kubernetes learning and testing",
-    version="0.1.0",
-)
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Create app instance
+app = create_app()
 
 # Initialize components
 retriever = create_retriever(config)
@@ -60,7 +75,8 @@ class SearchRequest(BaseModel):
 
 
 class IngestRequest(BaseModel):
-    text: str = Field(..., description="Text to ingest")
+    text: Optional[str] = Field(None, description="Text to ingest")
+    file_path: Optional[str] = Field(None, description="Path to file to ingest")
     metadata: Optional[Dict[str, Any]] = Field(
         default=None, description="Optional metadata"
     )
@@ -95,19 +111,29 @@ class StatsResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     version: str
+    timestamp: str
 
 
 # API Endpoints
 @app.get("/", response_model=HealthResponse)
 async def root():
     """Health check endpoint."""
-    return {"status": "healthy", "version": "0.1.0"}
+    return {
+        "status": "healthy",
+        "version": "0.1.0",
+        "timestamp": datetime.utcnow().isoformat(),
+    }
 
 
 @app.get("/health", response_model=HealthResponse)
+@app.post("/health", response_model=HealthResponse)
 async def health():
     """Detailed health check."""
-    return {"status": "healthy", "version": "0.1.0"}
+    return {
+        "status": "healthy",
+        "version": "0.1.0",
+        "timestamp": datetime.utcnow().isoformat(),
+    }
 
 
 @app.post("/query", response_model=QueryResponse)
@@ -200,23 +226,57 @@ async def search_endpoint(request: SearchRequest):
 @app.post("/ingest")
 async def ingest_endpoint(request: IngestRequest):
     """
-    Ingest text directly into the RAG system.
+    Ingest text or file into the RAG system.
     """
     try:
-        logger.info(f"Ingesting text from: {request.source_name}")
+        # Validate that either text or file_path is provided
+        if not request.text and not request.file_path:
+            raise HTTPException(
+                status_code=422, detail="Either 'text' or 'file_path' must be provided"
+            )
 
-        num_chunks = pipeline.ingest_from_text(
-            request.text, metadata=request.metadata, source_name=request.source_name
-        )
+        # Handle file ingestion
+        if request.file_path:
+            file_path = Path(request.file_path)
 
-        return {
-            "status": "success",
-            "chunks_created": num_chunks,
-            "source_name": request.source_name,
-        }
+            # Check if file exists
+            if not file_path.exists():
+                raise HTTPException(status_code=404, detail="File not found")
 
+            # Validate file format
+            supported_formats = {".md", ".txt", ".pdf", ".html"}
+            if file_path.suffix.lower() not in supported_formats:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Unsupported file format. Supported: {', '.join(supported_formats)}",
+                )
+
+            logger.info(f"Ingesting file: {request.file_path}")
+            num_chunks = pipeline.ingest_file(file_path)
+
+            return {
+                "status": "success",
+                "chunks_ingested": num_chunks,
+                "file_path": request.file_path,
+            }
+
+        # Handle text ingestion
+        else:
+            logger.info(f"Ingesting text from: {request.source_name}")
+            num_chunks = pipeline.ingest_from_text(
+                request.text, metadata=request.metadata, source_name=request.source_name
+            )
+
+            return {
+                "status": "success",
+                "chunks_created": num_chunks,
+                "source_name": request.source_name,
+            }
+
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error ingesting text: {e}")
+        logger.error(f"Error ingesting: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -265,6 +325,30 @@ async def categories_endpoint():
             },
         ]
     }
+
+
+@app.post("/reset")
+async def reset_endpoint():
+    """
+    Reset the vector database by deleting the collection.
+    """
+    try:
+        from .retrieval.vector_store import VectorStore
+
+        logger.info("Resetting vector database")
+
+        vector_store = VectorStore(
+            collection_name=config.vector_db.collection_name,
+            persist_directory=config.vector_db.persist_directory,
+        )
+
+        vector_store.delete_collection()
+
+        return {"message": "Vector database reset successfully", "status": "success"}
+
+    except Exception as e:
+        logger.error(f"Error resetting database: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # Run server

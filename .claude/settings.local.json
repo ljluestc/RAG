@@ -1,7 +1,39 @@
 {
   "permissions": {
-    "allow": ["Bash(mkdir:*)", "Bash(tree:*)"],
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(tree:*)",
+      "WebFetch(domain:jobright.ai)",
+      "WebSearch",
+      "WebFetch(domain:jobcopilot.com)",
+      "WebFetch(domain:creati.ai)",
+      "WebFetch(domain:itmunch.com)",
+      "Read(//home/calelin/**)",
+      "Bash(task-master:*)",
+      "Bash(test:*)",
+      "Bash(echo $ANTHROPIC_API_KEY)",
+      "Bash(cat:*)",
+      "Bash(cd:*)",
+      "Bash(find:*)",
+      "Bash(echo \"ANTHROPIC_API_KEY: $ANTHROPIC_API_KEY:0:10...\")",
+      "Bash(echo \"OPENAI_API_KEY: $OPENAI_API_KEY:0:10...\")",
+      "Bash(echo \"PERPLEXITY_API_KEY: $PERPLEXITY_API_KEY:0:10...\")",
+      "Bash(python3 -m pytest:*)",
+      "Bash(python3:*)",
+      "Bash(tee:*)",
+      "Bash(source venv/bin/activate)",
+      "Bash(pre-commit run:*)",
+      "Bash(pytest:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(make test:*)",
+      "Bash(. venv/bin/activate)",
+      "Bash(venv/bin/python -m pytest tests/test_retrieval_comprehensive.py::TestVectorStore -v --tb=short)",
+      "Bash(venv/bin/python -m pytest:*)"
+    ],
     "deny": [],
     "ask": []
-  }
+  },
+  "enabledMcpjsonServers": [
+    "task-master-ai"
+  ]
 }

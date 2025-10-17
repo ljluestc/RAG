@@ -1,12 +1,32 @@
 """Integration tests for API endpoints."""
 
 import json
+
+# Set up test environment before importing API
+import os
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+
+os.environ.update(
+    {
+        "OPENAI_API_KEY": "test-key-12345",
+        "ANTHROPIC_API_KEY": "test-key-12345",
+        "PERPLEXITY_API_KEY": "test-key-12345",
+        "GOOGLE_API_KEY": "test-key-12345",
+        "MISTRAL_API_KEY": "test-key-12345",
+        "XAI_API_KEY": "test-key-12345",
+        "OPENROUTER_API_KEY": "test-key-12345",
+        "AZURE_OPENAI_API_KEY": "test-key-12345",
+        "OLLAMA_API_KEY": "test-key-12345",
+        "TESTING": "true",
+        "LOG_LEVEL": "DEBUG",
+    }
+)
+
 from src.api import app
 from src.generation.llm import RAGGenerator
 from src.ingestion.document_processor import Document

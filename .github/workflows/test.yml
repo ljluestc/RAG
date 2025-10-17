@@ -1,0 +1,107 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ['3.10', '3.11', '3.12', '3.13']
+        exclude:
+          # Reduce matrix size - test all Python versions on Ubuntu only
+          - os: macos-latest
+            python-version: '3.10'
+          - os: macos-latest
+            python-version: '3.11'
+          - os: windows-latest
+            python-version: '3.10'
+          - os: windows-latest
+            python-version: '3.11'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov pytest-mock pytest-asyncio
+
+    - name: Run tests with coverage
+      env:
+        TESTING: "true"
+        OPENAI_API_KEY: "test-key"
+        ANTHROPIC_API_KEY: "test-key"
+      run: |
+        cd kubernetes_rag
+        python -m pytest --cov=src --cov-report=xml --cov-report=term-missing -v
+
+    - name: Upload coverage to Codecov
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./kubernetes_rag/coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+    - name: Archive coverage reports
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: kubernetes_rag/test_reports/
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install black isort flake8 mypy bandit
+
+    - name: Run black
+      run: |
+        cd kubernetes_rag
+        black --check src/ tests/
+
+    - name: Run isort
+      run: |
+        cd kubernetes_rag
+        isort --check-only --profile black src/ tests/
+
+    - name: Run flake8
+      run: |
+        cd kubernetes_rag
+        flake8 src/ tests/ --max-line-length=88 --extend-ignore=E203,W503
+
+    - name: Run mypy
+      run: |
+        cd kubernetes_rag
+        mypy src/ --ignore-missing-imports || true
+
+    - name: Run bandit security checks
+      run: |
+        cd kubernetes_rag
+        bandit -r src/ -ll || true

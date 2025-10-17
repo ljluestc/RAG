@@ -1,528 +1,513 @@
 """Comprehensive test suite for API module to achieve 100% coverage."""
 
-import asyncio
-import json
-import shutil
+import os
 import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+# Set up test environment before importing API
+os.environ.update(
+    {
+        "OPENAI_API_KEY": "test-key-12345",
+        "ANTHROPIC_API_KEY": "test-key-12345",
+        "PERPLEXITY_API_KEY": "test-key-12345",
+        "GOOGLE_API_KEY": "test-key-12345",
+        "MISTRAL_API_KEY": "test-key-12345",
+        "XAI_API_KEY": "test-key-12345",
+        "OPENROUTER_API_KEY": "test-key-12345",
+        "AZURE_OPENAI_API_KEY": "test-key-12345",
+        "OLLAMA_API_KEY": "test-key-12345",
+        "TESTING": "true",
+        "LOG_LEVEL": "DEBUG",
+    }
+)
+
 from src.api import app, create_app
-from src.utils.config_loader import get_config
 
 
 class TestAPICreation:
     """Test API creation and initialization."""
 
-    def test_create_app(self):
-        """Test app creation."""
-        test_app = create_app()
-
-        assert test_app is not None
-        assert isinstance(test_app, FastAPI)
-
-    def test_app_instance(self):
-        """Test app instance."""
+    def test_app_exists(self):
+        """Test that FastAPI app exists."""
         assert app is not None
-        assert isinstance(app, FastAPI)
 
-    def test_app_title(self):
-        """Test app title."""
-        assert app.title is not None
-        assert isinstance(app.title, str)
-        assert len(app.title) > 0
+    def test_create_app(self):
+        """Test create_app function."""
+        with patch("src.utils.config_loader.get_config") as mock_get_config:
+            mock_config = Mock()
+            mock_settings = Mock()
+            mock_get_config.return_value = (mock_config, mock_settings)
 
-    def test_app_version(self):
-        """Test app version."""
-        assert app.version is not None
-        assert isinstance(app.version, str)
+            test_app = create_app()
 
+            assert test_app is not None
+            assert test_app.title == "Kubernetes RAG API"
 
-class TestAPIEndpoints:
-    """Test API endpoints."""
-
-    def setup_method(self):
-        """Set up test client."""
-        self.client = TestClient(app)
-
-    def test_health_endpoint(self):
-        """Test health endpoint."""
-        response = self.client.get("/health")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "status" in data
-        assert data["status"] == "healthy"
-
-    def test_stats_endpoint(self):
-        """Test stats endpoint."""
-        response = self.client.get("/stats")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert isinstance(data, dict)
-
-    @patch("src.api.create_retriever")
-    @patch("src.api.create_rag_generator")
-    def test_query_endpoint_success(self, mock_generator, mock_retriever):
-        """Test successful query endpoint."""
-        # Mock retriever and generator
-        mock_retriever_instance = Mock()
-        mock_retriever_instance.retrieve.return_value = [
-            {"content": "Test content", "score": 0.9, "metadata": {}}
-        ]
-        mock_retriever.return_value = mock_retriever_instance
-
-        mock_generator_instance = Mock()
-        mock_generator_instance.generate_answer.return_value = {
-            "answer": "Test answer",
-            "sources": [],
-            "metadata": {},
-        }
-        mock_generator.return_value = mock_generator_instance
-
-        query_data = {
-            "query": "What is Kubernetes?",
-            "top_k": 5,
-            "generate_answer": True,
-        }
-
-        response = self.client.post("/query", json=query_data)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "answer" in data
-        assert "sources" in data
-        assert "metadata" in data
-
-    def test_query_endpoint_missing_query(self):
-        """Test query endpoint with missing query."""
-        query_data = {"top_k": 5, "generate_answer": True}
-
-        response = self.client.post("/query", json=query_data)
-
-        assert response.status_code == 422  # Validation error
-
-    def test_query_endpoint_invalid_query(self):
-        """Test query endpoint with invalid query."""
-        query_data = {"query": "", "top_k": 5, "generate_answer": True}  # Empty query
-
-        response = self.client.post("/query", json=query_data)
-
-        assert response.status_code == 422  # Validation error
-
-    @patch("src.api.create_retriever")
-    def test_search_endpoint_success(self, mock_retriever):
-        """Test successful search endpoint."""
-        # Mock retriever
-        mock_retriever_instance = Mock()
-        mock_retriever_instance.retrieve.return_value = [
-            {"content": "Test content", "score": 0.9, "metadata": {}}
-        ]
-        mock_retriever.return_value = mock_retriever_instance
-
-        search_data = {
-            "query": "Kubernetes deployment",
-            "top_k": 5,
-            "category": "qa_pair",
-            "score_threshold": 0.7,
-        }
-
-        response = self.client.post("/search", json=search_data)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "results" in data
-        assert isinstance(data["results"], list)
-
-    def test_search_endpoint_missing_query(self):
-        """Test search endpoint with missing query."""
-        search_data = {"top_k": 5, "category": "qa_pair"}
-
-        response = self.client.post("/search", json=search_data)
-
-        assert response.status_code == 422  # Validation error
-
-    @patch("src.api.create_ingestion_pipeline")
-    def test_ingest_endpoint_success(self, mock_pipeline):
-        """Test successful ingest endpoint."""
-        # Mock pipeline
-        mock_pipeline_instance = Mock()
-        mock_pipeline_instance.ingest_from_text.return_value = {
-            "chunks_created": 1,
-            "source_name": "test_source",
-        }
-        mock_pipeline.return_value = mock_pipeline_instance
-
-        ingest_data = {
-            "text": "Test Kubernetes content",
-            "metadata": {"source": "test"},
-            "source_name": "test_document",
-        }
-
-        response = self.client.post("/ingest", json=ingest_data)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "message" in data
-        assert "chunks_created" in data
-
-    def test_ingest_endpoint_missing_text(self):
-        """Test ingest endpoint with missing text."""
-        ingest_data = {"metadata": {"source": "test"}, "source_name": "test_document"}
-
-        response = self.client.post("/ingest", json=ingest_data)
-
-        assert response.status_code == 422  # Validation error
-
-    def test_ingest_endpoint_empty_text(self):
-        """Test ingest endpoint with empty text."""
-        ingest_data = {
-            "text": "",  # Empty text
-            "metadata": {"source": "test"},
-            "source_name": "test_document",
-        }
-
-        response = self.client.post("/ingest", json=ingest_data)
-
-        assert response.status_code == 422  # Validation error
-
-
-class TestAPIErrorHandling:
-    """Test API error handling."""
-
-    def setup_method(self):
-        """Set up test client."""
-        self.client = TestClient(app)
-
-    @patch("src.api.create_retriever")
-    def test_query_endpoint_retriever_error(self, mock_retriever):
-        """Test query endpoint with retriever error."""
-        # Mock retriever to raise exception
-        mock_retriever.side_effect = Exception("Retriever error")
-
-        query_data = {
-            "query": "What is Kubernetes?",
-            "top_k": 5,
-            "generate_answer": True,
-        }
-
-        response = self.client.post("/query", json=query_data)
-
-        assert response.status_code == 500
-        data = response.json()
-        assert "error" in data
-
-    @patch("src.api.create_rag_generator")
-    def test_query_endpoint_generator_error(self, mock_generator):
-        """Test query endpoint with generator error."""
-        # Mock generator to raise exception
-        mock_generator.side_effect = Exception("Generator error")
-
-        query_data = {
-            "query": "What is Kubernetes?",
-            "top_k": 5,
-            "generate_answer": True,
-        }
-
-        response = self.client.post("/query", json=query_data)
-
-        assert response.status_code == 500
-        data = response.json()
-        assert "error" in data
-
-    @patch("src.api.create_retriever")
-    def test_search_endpoint_retriever_error(self, mock_retriever):
-        """Test search endpoint with retriever error."""
-        # Mock retriever to raise exception
-        mock_retriever.side_effect = Exception("Retriever error")
-
-        search_data = {"query": "Kubernetes deployment", "top_k": 5}
-
-        response = self.client.post("/search", json=search_data)
-
-        assert response.status_code == 500
-        data = response.json()
-        assert "error" in data
-
-    @patch("src.api.create_ingestion_pipeline")
-    def test_ingest_endpoint_pipeline_error(self, mock_pipeline):
-        """Test ingest endpoint with pipeline error."""
-        # Mock pipeline to raise exception
-        mock_pipeline.side_effect = Exception("Pipeline error")
-
-        ingest_data = {
-            "text": "Test content",
-            "metadata": {"source": "test"},
-            "source_name": "test_document",
-        }
-
-        response = self.client.post("/ingest", json=ingest_data)
-
-        assert response.status_code == 500
-        data = response.json()
-        assert "error" in data
-
-
-class TestAPIValidation:
-    """Test API request validation."""
-
-    def setup_method(self):
-        """Set up test client."""
-        self.client = TestClient(app)
-
-    def test_query_validation_top_k_range(self):
-        """Test query validation for top_k range."""
-        query_data = {
-            "query": "What is Kubernetes?",
-            "top_k": -1,  # Invalid negative value
-            "generate_answer": True,
-        }
-
-        response = self.client.post("/query", json=query_data)
-
-        assert response.status_code == 422  # Validation error
-
-    def test_query_validation_top_k_type(self):
-        """Test query validation for top_k type."""
-        query_data = {
-            "query": "What is Kubernetes?",
-            "top_k": "invalid",  # Invalid type
-            "generate_answer": True,
-        }
-
-        response = self.client.post("/query", json=query_data)
-
-        assert response.status_code == 422  # Validation error
-
-    def test_search_validation_score_threshold_range(self):
-        """Test search validation for score_threshold range."""
-        search_data = {
-            "query": "Kubernetes deployment",
-            "top_k": 5,
-            "score_threshold": 1.5,  # Invalid range (> 1.0)
-        }
-
-        response = self.client.post("/search", json=search_data)
-
-        assert response.status_code == 422  # Validation error
-
-    def test_search_validation_score_threshold_type(self):
-        """Test search validation for score_threshold type."""
-        search_data = {
-            "query": "Kubernetes deployment",
-            "top_k": 5,
-            "score_threshold": "invalid",  # Invalid type
-        }
-
-        response = self.client.post("/search", json=search_data)
-
-        assert response.status_code == 422  # Validation error
-
-    def test_ingest_validation_metadata_type(self):
-        """Test ingest validation for metadata type."""
-        ingest_data = {
-            "text": "Test content",
-            "metadata": "invalid",  # Should be dict
-            "source_name": "test_document",
-        }
-
-        response = self.client.post("/ingest", json=ingest_data)
-
-        assert response.status_code == 422  # Validation error
-
-
-class TestAPIPerformance:
-    """Test API performance."""
-
-    def setup_method(self):
-        """Set up test client."""
-        self.client = TestClient(app)
-
-    def test_health_endpoint_performance(self):
-        """Test health endpoint performance."""
-        import time
-
-        start_time = time.time()
-        response = self.client.get("/health")
-        end_time = time.time()
-
-        assert response.status_code == 200
-        assert (end_time - start_time) < 0.1  # Should be very fast
-
-    def test_stats_endpoint_performance(self):
-        """Test stats endpoint performance."""
-        import time
-
-        start_time = time.time()
-        response = self.client.get("/stats")
-        end_time = time.time()
-
-        assert response.status_code == 200
-        assert (end_time - start_time) < 1.0  # Should be fast
-
-    @patch("src.api.create_retriever")
-    def test_query_endpoint_performance(self, mock_retriever):
-        """Test query endpoint performance."""
-        import time
-
-        # Mock retriever
-        mock_retriever_instance = Mock()
-        mock_retriever_instance.retrieve.return_value = []
-        mock_retriever.return_value = mock_retriever_instance
-
-        query_data = {
-            "query": "What is Kubernetes?",
-            "top_k": 5,
-            "generate_answer": False,  # Faster without generation
-        }
-
-        start_time = time.time()
-        response = self.client.post("/query", json=query_data)
-        end_time = time.time()
-
-        assert response.status_code == 200
-        assert (end_time - start_time) < 2.0  # Should be reasonably fast
-
-
-class TestAPIIntegration:
-    """Test API integration scenarios."""
-
-    def setup_method(self):
-        """Set up test client."""
-        self.client = TestClient(app)
-
-    @patch("src.api.create_retriever")
-    @patch("src.api.create_rag_generator")
-    def test_full_query_workflow(self, mock_generator, mock_retriever):
-        """Test full query workflow."""
-        # Mock retriever
-        mock_retriever_instance = Mock()
-        mock_retriever_instance.retrieve.return_value = [
-            {
-                "content": "Kubernetes is a container orchestration platform",
-                "score": 0.9,
-                "metadata": {},
-            }
-        ]
-        mock_retriever.return_value = mock_retriever_instance
-
-        # Mock generator
-        mock_generator_instance = Mock()
-        mock_generator_instance.generate_answer.return_value = {
-            "answer": "Kubernetes is a container orchestration platform that automates deployment, scaling, and management of containerized applications.",
-            "sources": ["source1"],
-            "metadata": {"model": "gpt-3.5-turbo"},
-        }
-        mock_generator.return_value = mock_generator_instance
-
-        # Test query
-        query_data = {
-            "query": "What is Kubernetes?",
-            "top_k": 5,
-            "generate_answer": True,
-            "temperature": 0.3,
-        }
-
-        response = self.client.post("/query", json=query_data)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "answer" in data
-        assert "sources" in data
-        assert "metadata" in data
-        assert len(data["answer"]) > 0
-
-    @patch("src.api.create_ingestion_pipeline")
-    def test_full_ingest_workflow(self, mock_pipeline):
-        """Test full ingest workflow."""
-        # Mock pipeline
-        mock_pipeline_instance = Mock()
-        mock_pipeline_instance.ingest_from_text.return_value = {
-            "chunks_created": 3,
-            "source_name": "test_document",
-            "metadata": {"source": "api_test"},
-        }
-        mock_pipeline.return_value = mock_pipeline_instance
-
-        # Test ingest
-        ingest_data = {
-            "text": "Kubernetes is a container orchestration platform. It helps manage containerized applications.",
-            "metadata": {"source": "api_test", "category": "introduction"},
-            "source_name": "kubernetes_intro",
-        }
-
-        response = self.client.post("/ingest", json=ingest_data)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "message" in data
-        assert "chunks_created" in data
-        assert data["chunks_created"] == 3
-
-
-class TestAPIConfiguration:
-    """Test API configuration."""
-
-    def test_api_configuration(self):
-        """Test API configuration."""
-        config, settings = get_config()
-
-        assert config is not None
-        assert settings is not None
-
-        # Test that config has required sections
-        assert hasattr(config, "llm")
-        assert hasattr(config, "retrieval")
-        assert hasattr(config, "vector_db")
-
-    def test_api_cors_configuration(self):
-        """Test API CORS configuration."""
-        # Test that CORS is properly configured
+    def test_app_routes(self):
+        """Test that app has all required routes."""
         client = TestClient(app)
 
-        # Test OPTIONS request (CORS preflight)
-        response = client.options("/query")
+        # Test health endpoint
+        response = client.get("/health")
+        assert response.status_code == 200
 
-        # Should handle CORS properly
-        assert response.status_code in [
-            200,
-            405,
-        ]  # Either success or method not allowed
+        # Test docs endpoint
+        response = client.get("/docs")
+        assert response.status_code == 200
 
 
-# Test markers for pytest
+class TestHealthEndpoint:
+    """Test health endpoint."""
+
+    def test_health_get(self):
+        """Test GET /health endpoint."""
+        client = TestClient(app)
+        response = client.get("/health")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "healthy"
+        assert "timestamp" in data
+
+    def test_health_post(self):
+        """Test POST /health endpoint."""
+        client = TestClient(app)
+        response = client.post("/health")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "healthy"
+        assert "timestamp" in data
+
+
+class TestQueryEndpoint:
+    """Test query endpoint."""
+
+    def test_query_post_success(self):
+        """Test successful POST /query endpoint."""
+        client = TestClient(app)
+
+        with patch("src.generation.llm.create_rag_generator") as mock_create_generator:
+            mock_generator = Mock()
+            mock_generator.generate_answer.return_value = {
+                "answer": "Test answer",
+                "query": "Test query",
+                "documents": [],
+            }
+            mock_create_generator.return_value = mock_generator
+
+            response = client.post("/query", json={"query": "Test query", "top_k": 5})
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["answer"] == "Test answer"
+            assert data["query"] == "Test query"
+
+    def test_query_post_missing_query(self):
+        """Test POST /query with missing query."""
+        client = TestClient(app)
+
+        response = client.post("/query", json={})
+
+        assert response.status_code == 422
+
+    def test_query_post_invalid_json(self):
+        """Test POST /query with invalid JSON."""
+        client = TestClient(app)
+
+        response = client.post("/query", data="invalid json")
+
+        assert response.status_code == 422
+
+    def test_query_post_generator_error(self):
+        """Test POST /query with generator error."""
+        client = TestClient(app)
+
+        with patch("src.generation.llm.create_rag_generator") as mock_create_generator:
+            mock_generator = Mock()
+            mock_generator.generate_answer.side_effect = Exception("Generator error")
+            mock_create_generator.return_value = mock_generator
+
+            response = client.post("/query", json={"query": "Test query"})
+
+            assert response.status_code == 500
+
+    def test_query_get_method_not_allowed(self):
+        """Test GET /query method not allowed."""
+        client = TestClient(app)
+
+        response = client.get("/query")
+
+        assert response.status_code == 405
+
+
+class TestSearchEndpoint:
+    """Test search endpoint."""
+
+    def test_search_post_success(self):
+        """Test successful POST /search endpoint."""
+        client = TestClient(app)
+
+        with patch("src.retrieval.retriever.create_retriever") as mock_create_retriever:
+            mock_retriever = Mock()
+            mock_retriever.retrieve.return_value = [
+                {
+                    "content": "Test document",
+                    "metadata": {"source": "test.md"},
+                    "score": 0.9,
+                }
+            ]
+            mock_create_retriever.return_value = mock_retriever
+
+            response = client.post("/search", json={"query": "Test query", "top_k": 5})
+
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data["results"]) == 1
+            assert data["results"][0]["content"] == "Test document"
+
+    def test_search_post_missing_query(self):
+        """Test POST /search with missing query."""
+        client = TestClient(app)
+
+        response = client.post("/search", json={})
+
+        assert response.status_code == 422
+
+    def test_search_post_retriever_error(self):
+        """Test POST /search with retriever error."""
+        client = TestClient(app)
+
+        with patch("src.retrieval.retriever.create_retriever") as mock_create_retriever:
+            mock_retriever = Mock()
+            mock_retriever.retrieve.side_effect = Exception("Retriever error")
+            mock_create_retriever.return_value = mock_retriever
+
+            response = client.post("/search", json={"query": "Test query"})
+
+            assert response.status_code == 500
+
+    def test_search_get_method_not_allowed(self):
+        """Test GET /search method not allowed."""
+        client = TestClient(app)
+
+        response = client.get("/search")
+
+        assert response.status_code == 405
+
+
+class TestIngestEndpoint:
+    """Test ingest endpoint."""
+
+    def test_ingest_post_success(self):
+        """Test successful POST /ingest endpoint."""
+        client = TestClient(app)
+
+        with patch(
+            "src.ingestion.pipeline.create_ingestion_pipeline"
+        ) as mock_create_pipeline:
+            mock_pipeline = Mock()
+            mock_pipeline.ingest_file.return_value = 5
+            mock_create_pipeline.return_value = mock_pipeline
+
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+                f.write("# Test Document\n\nSome content.")
+                f.flush()
+
+                try:
+                    response = client.post("/ingest", json={"file_path": f.name})
+
+                    assert response.status_code == 200
+                    data = response.json()
+                    assert data["chunks_ingested"] == 5
+                finally:
+                    os.unlink(f.name)
+
+    def test_ingest_post_missing_file_path(self):
+        """Test POST /ingest with missing file_path."""
+        client = TestClient(app)
+
+        response = client.post("/ingest", json={})
+
+        assert response.status_code == 422
+
+    def test_ingest_post_file_not_found(self):
+        """Test POST /ingest with non-existent file."""
+        client = TestClient(app)
+
+        response = client.post("/ingest", json={"file_path": "non_existent_file.md"})
+
+        assert response.status_code == 404
+
+    def test_ingest_post_pipeline_error(self):
+        """Test POST /ingest with pipeline error."""
+        client = TestClient(app)
+
+        with patch(
+            "src.ingestion.pipeline.create_ingestion_pipeline"
+        ) as mock_create_pipeline:
+            mock_pipeline = Mock()
+            mock_pipeline.ingest_file.side_effect = Exception("Pipeline error")
+            mock_create_pipeline.return_value = mock_pipeline
+
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+                f.write("# Test Document\n\nSome content.")
+                f.flush()
+
+                try:
+                    response = client.post("/ingest", json={"file_path": f.name})
+
+                    assert response.status_code == 500
+                finally:
+                    os.unlink(f.name)
+
+    def test_ingest_get_method_not_allowed(self):
+        """Test GET /ingest method not allowed."""
+        client = TestClient(app)
+
+        response = client.get("/ingest")
+
+        assert response.status_code == 405
+
+
+class TestStatsEndpoint:
+    """Test stats endpoint."""
+
+    def test_stats_get_success(self):
+        """Test successful GET /stats endpoint."""
+        client = TestClient(app)
+
+        with patch("src.retrieval.vector_store.create_vector_store") as mock_create_vs:
+            mock_vector_store = Mock()
+            mock_vector_store.get_collection_stats.return_value = {
+                "name": "test_collection",
+                "count": 100,
+                "persist_directory": "/tmp/test",
+            }
+            mock_create_vs.return_value = mock_vector_store
+
+            response = client.get("/stats")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["collection_name"] == "test_collection"
+            assert data["document_count"] == 100
+
+    def test_stats_get_vector_store_error(self):
+        """Test GET /stats with vector store error."""
+        client = TestClient(app)
+
+        with patch("src.retrieval.vector_store.create_vector_store") as mock_create_vs:
+            mock_vector_store = Mock()
+            mock_vector_store.get_collection_stats.side_effect = Exception(
+                "Vector store error"
+            )
+            mock_create_vs.return_value = mock_vector_store
+
+            response = client.get("/stats")
+
+            assert response.status_code == 500
+
+    def test_stats_post_method_not_allowed(self):
+        """Test POST /stats method not allowed."""
+        client = TestClient(app)
+
+        response = client.post("/stats")
+
+        assert response.status_code == 405
+
+
+class TestResetEndpoint:
+    """Test reset endpoint."""
+
+    def test_reset_post_success(self):
+        """Test successful POST /reset endpoint."""
+        client = TestClient(app)
+
+        with patch("src.retrieval.vector_store.create_vector_store") as mock_create_vs:
+            mock_vector_store = Mock()
+            mock_vector_store.delete_collection.return_value = None
+            mock_create_vs.return_value = mock_vector_store
+
+            response = client.post("/reset")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["message"] == "Vector database reset successfully"
+
+    def test_reset_post_vector_store_error(self):
+        """Test POST /reset with vector store error."""
+        client = TestClient(app)
+
+        with patch("src.retrieval.vector_store.create_vector_store") as mock_create_vs:
+            mock_vector_store = Mock()
+            mock_vector_store.delete_collection.side_effect = Exception(
+                "Vector store error"
+            )
+            mock_create_vs.return_value = mock_vector_store
+
+            response = client.post("/reset")
+
+            assert response.status_code == 500
+
+    def test_reset_get_method_not_allowed(self):
+        """Test GET /reset method not allowed."""
+        client = TestClient(app)
+
+        response = client.get("/reset")
+
+        assert response.status_code == 405
+
+
 @pytest.mark.unit
-class TestUnitAPI(TestAPICreation, TestAPIValidation):
-    """Unit tests for API module."""
+class TestAPIEdgeCases:
+    """Test edge cases for API module."""
 
-    pass
+    def test_query_with_empty_documents(self):
+        """Test query with empty documents."""
+        client = TestClient(app)
+
+        with patch("src.generation.llm.create_rag_generator") as mock_create_generator:
+            mock_generator = Mock()
+            mock_generator.generate_answer.return_value = {
+                "answer": "No documents found",
+                "query": "Test query",
+                "documents": [],
+            }
+            mock_create_generator.return_value = mock_generator
+
+            response = client.post("/query", json={"query": "Test query"})
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["answer"] == "No documents found"
+
+    def test_search_with_empty_results(self):
+        """Test search with empty results."""
+        client = TestClient(app)
+
+        with patch("src.retrieval.retriever.create_retriever") as mock_create_retriever:
+            mock_retriever = Mock()
+            mock_retriever.retrieve.return_value = []
+            mock_create_retriever.return_value = mock_retriever
+
+            response = client.post("/search", json={"query": "Test query"})
+
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data["results"]) == 0
+
+    def test_ingest_with_unsupported_file_format(self):
+        """Test ingest with unsupported file format."""
+        client = TestClient(app)
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".xyz", delete=False) as f:
+            f.write("Some content")
+            f.flush()
+
+            try:
+                response = client.post("/ingest", json={"file_path": f.name})
+
+                assert response.status_code == 400
+            finally:
+                os.unlink(f.name)
+
+    def test_stats_with_empty_collection(self):
+        """Test stats with empty collection."""
+        client = TestClient(app)
+
+        with patch("src.retrieval.vector_store.create_vector_store") as mock_create_vs:
+            mock_vector_store = Mock()
+            mock_vector_store.get_collection_stats.return_value = {
+                "name": "test_collection",
+                "count": 0,
+                "persist_directory": "/tmp/test",
+            }
+            mock_create_vs.return_value = mock_vector_store
+
+            response = client.get("/stats")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["document_count"] == 0
 
 
 @pytest.mark.integration
-class TestIntegrationAPI(TestAPIEndpoints, TestAPIIntegration):
-    """Integration tests for API module."""
+class TestAPIIntegration:
+    """Test API integration scenarios."""
 
-    pass
+    def test_full_workflow(self):
+        """Test full workflow: ingest -> search -> query."""
+        client = TestClient(app)
 
+        # Mock all dependencies
+        with patch(
+            "src.ingestion.pipeline.create_ingestion_pipeline"
+        ) as mock_create_pipeline, patch(
+            "src.retrieval.retriever.create_retriever"
+        ) as mock_create_retriever, patch(
+            "src.generation.llm.create_rag_generator"
+        ) as mock_create_generator:
 
-@pytest.mark.api
-class TestAPISpecific(TestAPIErrorHandling, TestAPIPerformance):
-    """API-specific tests."""
+            # Setup mocks
+            mock_pipeline = Mock()
+            mock_pipeline.ingest_file.return_value = 3
+            mock_create_pipeline.return_value = mock_pipeline
 
-    pass
+            mock_retriever = Mock()
+            mock_retriever.retrieve.return_value = [
+                {
+                    "content": "Test document",
+                    "metadata": {"source": "test.md"},
+                    "score": 0.9,
+                }
+            ]
+            mock_create_retriever.return_value = mock_retriever
 
+            mock_generator = Mock()
+            mock_generator.generate_answer.return_value = {
+                "answer": "Test answer",
+                "query": "Test query",
+                "documents": [],
+            }
+            mock_create_generator.return_value = mock_generator
 
-@pytest.mark.slow
-class TestSlowAPI(TestAPIPerformance):
-    """Slow tests for API module."""
+            # Test ingest
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+                f.write("# Test Document\n\nSome content.")
+                f.flush()
 
-    pass
+                try:
+                    response = client.post("/ingest", json={"file_path": f.name})
+                    assert response.status_code == 200
+
+                    # Test search
+                    response = client.post("/search", json={"query": "Test query"})
+                    assert response.status_code == 200
+
+                    # Test query
+                    response = client.post("/query", json={"query": "Test query"})
+                    assert response.status_code == 200
+
+                finally:
+                    os.unlink(f.name)
+
+    def test_error_handling_chain(self):
+        """Test error handling across multiple endpoints."""
+        client = TestClient(app)
+
+        # Test with missing API keys
+        with patch.dict(os.environ, {}, clear=True):
+            response = client.get("/health")
+            assert response.status_code == 200  # Health should still work
+
+            response = client.post("/query", json={"query": "Test"})
+            assert response.status_code == 500  # Query should fail

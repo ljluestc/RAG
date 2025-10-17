@@ -163,3 +163,23 @@ class HybridEmbedding:
             "sparse": sparse_embs,
             "weights": {"dense": dense_weight, "sparse": sparse_weight},
         }
+
+
+# Backwards compatibility alias
+EmbeddingsManager = EmbeddingGenerator
+
+
+def create_embeddings(
+    model_name: str = "sentence-transformers/all-MiniLM-L6-v2", device: str = None
+) -> EmbeddingGenerator:
+    """
+    Factory function to create an embedding generator.
+
+    Args:
+        model_name: Name of the sentence transformer model
+        device: Device to use (cuda/cpu)
+
+    Returns:
+        EmbeddingGenerator instance
+    """
+    return EmbeddingGenerator(model_name=model_name, device=device)

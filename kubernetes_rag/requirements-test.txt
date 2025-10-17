@@ -1,0 +1,280 @@
+# Core testing dependencies
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-html>=3.2.0
+pytest-xdist>=3.3.1
+pytest-benchmark>=4.0.0
+pytest-mock>=3.11.1
+pytest-asyncio>=0.21.1
+pytest-timeout>=2.1.0
+pytest-sugar>=0.9.7
+pytest-clarity>=1.0.1
+
+# Coverage and reporting
+coverage>=7.2.7
+coverage[toml]>=7.2.7
+coverage-badge>=1.1.0
+
+# Code quality and linting
+flake8>=6.0.0
+black>=23.7.0
+isort>=5.12.0
+mypy>=1.5.1
+pylint>=2.17.5
+autopep8>=2.0.2
+
+# Security scanning
+bandit>=1.7.5
+safety>=2.3.5
+semgrep>=1.25.0
+
+# Performance and profiling
+psutil>=5.9.5
+memory-profiler>=0.61.0
+py-spy>=0.3.14
+line-profiler>=4.1.1
+
+# API testing
+httpx>=0.24.1
+requests-mock>=1.11.0
+responses>=0.23.1
+
+# Mocking and fixtures
+factory-boy>=3.3.0
+faker>=19.3.1
+freezegun>=1.2.2
+
+# Database testing
+pytest-postgresql>=5.0.0
+pytest-mysql>=2.2.0
+pytest-mongodb>=2.4.1
+
+# Async testing
+aioresponses>=0.7.4
+pytest-aiohttp>=1.0.5
+
+# Documentation testing
+doctest>=3.10.0
+sphinx>=7.1.2
+sphinx-rtd-theme>=1.3.0
+
+# Pre-commit hooks
+pre-commit>=3.3.3
+
+# CI/CD tools
+commitizen>=3.13.0
+conventional-pre-commit>=3.0.0
+
+# Additional utilities
+click>=8.1.7
+rich>=13.5.2
+tqdm>=4.66.1
+colorama>=0.4.6
+
+# Development tools
+ipython>=8.14.0
+jupyter>=1.0.0
+notebook>=7.0.0
+
+# Type checking
+types-requests>=2.31.0
+types-PyYAML>=6.0.12
+types-click>=8.0.0
+
+# Testing utilities
+hypothesis>=6.82.0
+mutmut>=2.4.0
+pytest-mutagen>=0.1.0
+
+# Load testing
+locust>=2.16.1
+pytest-benchmark>=4.0.0
+
+# Monitoring and observability
+prometheus-client>=0.17.1
+opentelemetry-api>=1.20.0
+opentelemetry-sdk>=1.20.0
+
+# Data validation
+pydantic>=2.3.0
+marshmallow>=3.20.1
+cerberus>=1.3.4
+
+# File handling
+pathlib2>=2.3.7
+watchdog>=3.0.0
+
+# Environment management
+python-dotenv>=1.0.0
+environs>=10.0.0
+
+# Logging and debugging
+loguru>=0.7.0
+structlog>=23.1.0
+
+# Configuration management
+dynaconf>=3.2.0
+hydra-core>=1.3.2
+
+# Serialization
+orjson>=3.9.4
+msgpack>=1.0.7
+
+# Cryptography
+cryptography>=41.0.4
+pyjwt>=2.8.0
+
+# HTTP clients
+aiohttp>=3.8.5
+httpx>=0.24.1
+requests>=2.31.0
+
+# Data processing
+numpy>=1.24.3
+pandas>=2.0.3
+scipy>=1.11.1
+
+# Machine learning
+scikit-learn>=1.3.0
+sentence-transformers>=2.2.2
+transformers>=4.33.2
+
+# Vector databases
+chromadb>=0.4.0
+faiss-cpu>=1.7.4
+pinecone-client>=2.2.4
+
+# LLM providers
+openai>=0.27.8
+anthropic>=0.3.11
+google-generativeai>=0.3.0
+mistralai>=0.0.8
+xai>=0.0.1
+
+# Web framework
+fastapi>=0.103.1
+uvicorn>=0.23.2
+starlette>=0.27.0
+
+# CLI framework
+click>=8.1.7
+typer>=0.9.0
+rich>=13.5.2
+
+# Configuration
+pyyaml>=6.0.1
+toml>=0.10.2
+configparser>=6.0.0
+
+# Utilities
+tqdm>=4.66.1
+rich>=13.5.2
+colorama>=0.4.6
+click>=8.1.7
+
+# Testing data
+faker>=19.3.1
+factory-boy>=3.3.0
+
+# Documentation
+mkdocs>=1.5.2
+mkdocs-material>=9.1.8
+mkdocs-mermaid2-plugin>=1.1.1
+
+# Version management
+bump2version>=1.0.1
+setuptools-scm>=7.1.0
+
+# Package building
+build>=0.10.0
+twine>=4.0.2
+wheel>=0.41.2
+
+# Docker
+docker>=6.1.2
+
+# Git hooks
+gitpython>=3.1.32
+
+# File watching
+watchdog>=3.0.0
+
+# Process management
+psutil>=5.9.5
+
+# Memory profiling
+memory-profiler>=0.61.0
+pympler>=0.9
+
+# Network testing
+requests-mock>=1.11.0
+responses>=0.23.1
+
+# Database testing
+pytest-postgresql>=5.0.0
+pytest-mysql>=2.2.0
+
+# Cache testing
+pytest-redis>=3.0.0
+
+# Queue testing
+pytest-celery>=0.0.0
+
+# Web testing
+selenium>=4.11.2
+playwright>=1.36.0
+
+# API documentation
+swagger-ui-bundle>=0.0.9
+redoc>=0.0.1
+
+# Monitoring
+prometheus-client>=0.17.1
+
+# Logging
+structlog>=23.1.0
+
+# Configuration
+dynaconf>=3.2.0
+
+# Serialization
+orjson>=3.9.4
+
+# Cryptography
+cryptography>=41.0.4
+
+# HTTP
+aiohttp>=3.8.5
+httpx>=0.24.1
+
+# Data
+numpy>=1.24.3
+pandas>=2.0.3
+
+# ML
+scikit-learn>=1.3.0
+sentence-transformers>=2.2.2
+
+# Vector DB
+chromadb>=0.4.0
+faiss-cpu>=1.7.4
+
+# LLM
+openai>=0.27.8
+anthropic>=0.3.11
+
+# Web
+fastapi>=0.103.1
+uvicorn>=0.23.2
+
+# CLI
+click>=8.1.7
+typer>=0.9.0
+
+# Config
+pyyaml>=6.0.1
+toml>=0.10.2
+
+# Utils
+tqdm>=4.66.1
+rich>=13.5.2

@@ -14,15 +14,7 @@ from click.testing import CliRunner
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from src.cli import (
-    cli,
-    ingest_command,
-    interactive_command,
-    query_command,
-    reset_command,
-    search_command,
-    stats_command,
-)
+from src.cli import cli, ingest, interactive, query, reset, search, stats
 from src.utils.config_loader import get_config
 
 

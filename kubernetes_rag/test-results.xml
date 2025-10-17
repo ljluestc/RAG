@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="21" skipped="0" tests="35" time="25.240" timestamp="2025-10-17T11:27:19.870772-07:00" hostname="DESKTOP-FO42SG8"><testcase classname="tests.test_ingestion_fixed.TestDocument" name="test_document_init" time="0.002" /><testcase classname="tests.test_ingestion_fixed.TestMarkdownProcessor" name="test_markdown_processor_init" time="0.020" /><testcase classname="tests.test_ingestion_fixed.TestMarkdownProcessor" name="test_extract_sections" time="0.001" /><testcase classname="tests.test_ingestion_fixed.TestMarkdownProcessor" name="test_extract_sections_empty" time="0.001" /><testcase classname="tests.test_ingestion_fixed.TestMarkdownProcessor" name="test_extract_sections_no_headers" time="0.001" /><testcase classname="tests.test_ingestion_fixed.TestKubernetesDocProcessor" name="test_kubernetes_doc_processor_init" time="0.001" /><testcase classname="tests.test_ingestion_fixed.TestKubernetesDocProcessor" name="test_process_file_markdown" time="0.001" /><testcase classname="tests.test_ingestion_fixed.TestKubernetesDocProcessor" name="test_process_file_text" time="0.004" /><testcase classname="tests.test_ingestion_fixed.TestKubernetesDocProcessor" name="test_process_file_unsupported" time="0.001"><failure message="Failed: DID NOT RAISE &lt;class 'ValueError'&gt;">tests/test_ingestion_fixed.py:132: in test_process_file_unsupported
+    with pytest.raises(ValueError, match="Unsupported file type"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE &lt;class 'ValueError'&gt;</failure></testcase><testcase classname="tests.test_ingestion_fixed.TestKubernetesDocProcessor" name="test_chunk_text" time="0.002"><failure message="AttributeError: 'KubernetesDocProcessor' object has no attribute '_chunk_text'">tests/test_ingestion_fixed.py:142: in test_chunk_text
+    chunks = processor._chunk_text(text, chunk_size=100, overlap=20)
+             ^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'KubernetesDocProcessor' object has no attribute '_chunk_text'</failure></testcase><testcase classname="tests.test_ingestion_fixed.TestKubernetesDocProcessor" name="test_extract_metadata" time="0.001"><failure message="AttributeError: 'KubernetesDocProcessor' object has no attribute '_extract_metadata'">tests/test_ingestion_fixed.py:152: in test_extract_metadata
+    metadata = processor._extract_metadata(TEST_MARKDOWN_CONTENT, "test.md")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'KubernetesDocProcessor' object has no attribute '_extract_metadata'</failure></testcase><testcase classname="tests.test_ingestion_fixed.TestEmbeddingGenerator" name="test_embedding_generator_init" time="0.252"><failure message="OSError: sentence-transformers/test-model is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'&#10;If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth login` or by passing `token=&lt;your_token&gt;`">venv/lib/python3.13/site-packages/huggingface_hub/utils/_http.py:407: in hf_raise_for_status
+    response.raise_for_status()
+venv/lib/python3.13/site-packages/requests/models.py:1026: in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+E   requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://huggingface.co/sentence-transformers/test-model/resolve/main/adapter_config.json
+
+The above exception was the direct cause of the following exception:
+venv/lib/python3.13/site-packages/transformers/utils/hub.py:479: in cached_files
+    hf_hub_download(
+venv/lib/python3.13/site-packages/huggingface_hub/utils/_validators.py:114: in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.13/site-packages/huggingface_hub/file_download.py:1010: in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+venv/lib/python3.13/site-packages/huggingface_hub/file_download.py:1117: in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+venv/lib/python3.13/site-packages/huggingface_hub/file_download.py:1658: in _raise_on_head_call_error
+    raise head_call_error
+venv/lib/python3.13/site-packages/huggingface_hub/file_download.py:1546: in _get_metadata_or_catch_error
+    metadata = get_hf_file_metadata(
+venv/lib/python3.13/site-packages/huggingface_hub/utils/_validators.py:114: in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.13/site-packages/huggingface_hub/file_download.py:1463: in get_hf_file_metadata
+    r = _request_wrapper(
+venv/lib/python3.13/site-packages/huggingface_hub/file_download.py:286: in _request_wrapper
+    response = _request_wrapper(
+venv/lib/python3.13/site-packages/huggingface_hub/file_download.py:310: in _request_wrapper
+    hf_raise_for_status(response)
+venv/lib/python3.13/site-packages/huggingface_hub/utils/_http.py:457: in hf_raise_for_status
+    raise _format(RepositoryNotFoundError, message, response) from e
+E   huggingface_hub.errors.RepositoryNotFoundError: 401 Client Error. (Request ID: Root=1-68f28a91-77a101f8770df24038450c3e;b9b9bda7-3f97-428d-b6a3-b5970bd14489)
+E   
+E   Repository Not Found for url: https://huggingface.co/sentence-transformers/test-model/resolve/main/adapter_config.json.
+E   Please make sure you specified the correct `repo_id` and `repo_type`.
+E   If you are trying to access a private or gated repo, make sure you are authenticated. For more details, see https://huggingface.co/docs/huggingface_hub/authentication
+E   Invalid username or password.
+
+The above exception was the direct cause of the following exception:
+tests/test_ingestion_fixed.py:166: in test_embedding_generator_init
+    generator = EmbeddingGenerator(model_name="test-model")
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/ingestion/embeddings.py:31: in __init__
+    self.model = SentenceTransformer(model_name, device=device)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.13/site-packages/sentence_transformers/SentenceTransformer.py:339: in __init__
+    modules = self._load_auto_model(
+venv/lib/python3.13/site-packages/sentence_transformers/SentenceTransformer.py:2112: in _load_auto_model
+    transformer_model = Transformer(
+venv/lib/python3.13/site-packages/sentence_transformers/models/Transformer.py:87: in __init__
+    config, is_peft_model = self._load_config(model_name_or_path, cache_dir, backend, config_args)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.13/site-packages/sentence_transformers/models/Transformer.py:138: in _load_config
+    find_adapter_config_file(
+venv/lib/python3.13/site-packages/transformers/utils/peft_utils.py:88: in find_adapter_config_file
+    adapter_cached_filename = cached_file(
+venv/lib/python3.13/site-packages/transformers/utils/hub.py:322: in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.13/site-packages/transformers/utils/hub.py:511: in cached_files
+    raise OSError(
+E   OSError: sentence-transformers/test-model is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+E   If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth login` or by passing `token=&lt;your_token&gt;`</failure></testcase><testcase classname="tests.test_ingestion_fixed.TestEmbeddingGenerator" name="test_embedding_generator_init_with_device" time="0.179"><failure message="OSError: sentence-transformers/test-model is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'&#10;If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth login` or by passing `token=&lt;your_token&gt;`">venv/lib/python3.13/site-packages/huggingface_hub/utils/_http.py:407: in hf_raise_for_status
+    response.raise_for_status()
+venv/lib/python3.13/site-packages/requests/models.py:1026: in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+E   requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://huggingface.co/sentence-transformers/test-model/resolve/main/adapter_config.json
+
+The above exception was the direct cause of the following exception:
+venv/lib/python3.13/site-packages/transformers/utils/hub.py:479: in cached_files
+    hf_hub_download(
+venv/lib/python3.13/site-packages/huggingface_hub/utils/_validators.py:114: in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.13/site-packages/huggingface_hub/file_download.py:1010: in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+venv/lib/python3.13/site-packages/huggingface_hub/file_download.py:1117: in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+venv/lib/python3.13/site-packages/huggingface_hub/file_download.py:1658: in _raise_on_head_call_error
+    raise head_call_error
+venv/lib/python3.13/site-packages/huggingface_hub/file_download.py:1546: in _get_metadata_or_catch_error
+    metadata = get_hf_file_metadata(
+venv/lib/python3.13/site-packages/huggingface_hub/utils/_validators.py:114: in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.13/site-packages/huggingface_hub/file_download.py:1463: in get_hf_file_metadata
+    r = _request_wrapper(
+venv/lib/python3.13/site-packages/huggingface_hub/file_download.py:286: in _request_wrapper
+    response = _request_wrapper(
+venv/lib/python3.13/site-packages/huggingface_hub/file_download.py:310: in _request_wrapper
+    hf_raise_for_status(response)
+venv/lib/python3.13/site-packages/huggingface_hub/utils/_http.py:457: in hf_raise_for_status
+    raise _format(RepositoryNotFoundError, message, response) from e
+E   huggingface_hub.errors.RepositoryNotFoundError: 401 Client Error. (Request ID: Root=1-68f28a91-753b812f43d29755070562a7;df798011-1c08-4530-9f7f-6903434996a7)
+E   
+E   Repository Not Found for url: https://huggingface.co/sentence-transformers/test-model/resolve/main/adapter_config.json.
+E   Please make sure you specified the correct `repo_id` and `repo_type`.
+E   If you are trying to access a private or gated repo, make sure you are authenticated. For more details, see https://huggingface.co/docs/huggingface_hub/authentication
+E   Invalid username or password.
+
+The above exception was the direct cause of the following exception:
+tests/test_ingestion_fixed.py:174: in test_embedding_generator_init_with_device
+    generator = EmbeddingGenerator(model_name="test-model", device="cpu")
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/ingestion/embeddings.py:31: in __init__
+    self.model = SentenceTransformer(model_name, device=device)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.13/site-packages/sentence_transformers/SentenceTransformer.py:339: in __init__
+    modules = self._load_auto_model(
+venv/lib/python3.13/site-packages/sentence_transformers/SentenceTransformer.py:2112: in _load_auto_model
+    transformer_model = Transformer(
+venv/lib/python3.13/site-packages/sentence_transformers/models/Transformer.py:87: in __init__
+    config, is_peft_model = self._load_config(model_name_or_path, cache_dir, backend, config_args)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.13/site-packages/sentence_transformers/models/Transformer.py:138: in _load_config
+    find_adapter_config_file(
+venv/lib/python3.13/site-packages/transformers/utils/peft_utils.py:88: in find_adapter_config_file
+    adapter_cached_filename = cached_file(
+venv/lib/python3.13/site-packages/transformers/utils/hub.py:322: in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.13/site-packages/transformers/utils/hub.py:511: in cached_files
+    raise OSError(
+E   OSError: sentence-transformers/test-model is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+E   If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth login` or by passing `token=&lt;your_token&gt;`</failure></testcase><testcase classname="tests.test_ingestion_fixed.TestEmbeddingGenerator" name="test_encode_single_text" time="1.564"><failure message="assert (1, 384) == (1, 4)&#10;  &#10;  At index 1 diff: 384 != 4&#10;  &#10;  Full diff:&#10;    (&#10;        1,&#10;  -     4,&#10;  +     384,&#10;  ?     ++&#10;    )">tests/test_ingestion_fixed.py:186: in test_encode_single_text
+    assert result.shape == (1, 4)
+E   assert (1, 384) == (1, 4)
+E     
+E     At index 1 diff: 384 != 4
+E     
+E     Full diff:
+E       (
+E           1,
+E     -     4,
+E     +     384,
+E     ?     ++
+E       )</failure></testcase><testcase classname="tests.test_ingestion_fixed.TestEmbeddingGenerator" name="test_encode_multiple_texts" time="1.320"><failure message="assert (2, 384) == (2, 2)&#10;  &#10;  At index 1 diff: 384 != 2&#10;  &#10;  Full diff:&#10;    (&#10;        2,&#10;  -     2,&#10;  +     384,&#10;    )">tests/test_ingestion_fixed.py:197: in test_encode_multiple_texts
+    assert result.shape == (2, 2)
+E   assert (2, 384) == (2, 2)
+E     
+E     At index 1 diff: 384 != 2
+E     
+E     Full diff:
+E       (
+E           2,
+E     -     2,
+E     +     384,
+E       )</failure></testcase><testcase classname="tests.test_ingestion_fixed.TestEmbeddingGenerator" name="test_encode_with_parameters" time="1.322"><failure message="assert (1, 384) == (1, 4)&#10;  &#10;  At index 1 diff: 384 != 4&#10;  &#10;  Full diff:&#10;    (&#10;        1,&#10;  -     4,&#10;  +     384,&#10;  ?     ++&#10;    )">tests/test_ingestion_fixed.py:213: in test_encode_with_parameters
+    assert result.shape == (1, 4)
+E   assert (1, 384) == (1, 4)
+E     
+E     At index 1 diff: 384 != 4
+E     
+E     Full diff:
+E       (
+E           1,
+E     -     4,
+E     +     384,
+E     ?     ++
+E       )</failure></testcase><testcase classname="tests.test_ingestion_fixed.TestEmbeddingGenerator" name="test_embed_documents" time="1.457"><failure message="AttributeError: 'EmbeddingGenerator' object has no attribute 'embed_documents'. Did you mean: 'encode_documents'?">tests/test_ingestion_fixed.py:223: in test_embed_documents
+    result = generator.embed_documents(documents)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'EmbeddingGenerator' object has no attribute 'embed_documents'. Did you mean: 'encode_documents'?</failure></testcase><testcase classname="tests.test_ingestion_fixed.TestEmbeddingGenerator" name="test_embed_query" time="1.394"><failure message="AttributeError: 'EmbeddingGenerator' object has no attribute 'embed_query'. Did you mean: 'encode_query'?">tests/test_ingestion_fixed.py:234: in test_embed_query
+    result = generator.embed_query("Test query")
+             ^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'EmbeddingGenerator' object has no attribute 'embed_query'. Did you mean: 'encode_query'?</failure></testcase><testcase classname="tests.test_ingestion_fixed.TestCreateEmbeddings" name="test_create_embeddings" time="0.181"><failure message="OSError: sentence-transformers/test-model is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'&#10;If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth login` or by passing `token=&lt;your_token&gt;`">venv/lib/python3.13/site-packages/huggingface_hub/utils/_http.py:407: in hf_raise_for_status
+    response.raise_for_status()
+venv/lib/python3.13/site-packages/requests/models.py:1026: in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+E   requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://huggingface.co/sentence-transformers/test-model/resolve/main/adapter_config.json
+
+The above exception was the direct cause of the following exception:
+venv/lib/python3.13/site-packages/transformers/utils/hub.py:479: in cached_files
+    hf_hub_download(
+venv/lib/python3.13/site-packages/huggingface_hub/utils/_validators.py:114: in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.13/site-packages/huggingface_hub/file_download.py:1010: in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+venv/lib/python3.13/site-packages/huggingface_hub/file_download.py:1117: in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+venv/lib/python3.13/site-packages/huggingface_hub/file_download.py:1658: in _raise_on_head_call_error
+    raise head_call_error
+venv/lib/python3.13/site-packages/huggingface_hub/file_download.py:1546: in _get_metadata_or_catch_error
+    metadata = get_hf_file_metadata(
+venv/lib/python3.13/site-packages/huggingface_hub/utils/_validators.py:114: in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.13/site-packages/huggingface_hub/file_download.py:1463: in get_hf_file_metadata
+    r = _request_wrapper(
+venv/lib/python3.13/site-packages/huggingface_hub/file_download.py:286: in _request_wrapper
+    response = _request_wrapper(
+venv/lib/python3.13/site-packages/huggingface_hub/file_download.py:310: in _request_wrapper
+    hf_raise_for_status(response)
+venv/lib/python3.13/site-packages/huggingface_hub/utils/_http.py:457: in hf_raise_for_status
+    raise _format(RepositoryNotFoundError, message, response) from e
+E   huggingface_hub.errors.RepositoryNotFoundError: 401 Client Error. (Request ID: Root=1-68f28a99-1633e9c83f0454d01382bcec;5e28a066-75fb-49ca-98f6-4a5e3444878a)
+E   
+E   Repository Not Found for url: https://huggingface.co/sentence-transformers/test-model/resolve/main/adapter_config.json.
+E   Please make sure you specified the correct `repo_id` and `repo_type`.
+E   If you are trying to access a private or gated repo, make sure you are authenticated. For more details, see https://huggingface.co/docs/huggingface_hub/authentication
+E   Invalid username or password.
+
+The above exception was the direct cause of the following exception:
+tests/test_ingestion_fixed.py:247: in test_create_embeddings
+    generator = create_embeddings(model_name="test-model")
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/ingestion/embeddings.py:185: in create_embeddings
+    return EmbeddingGenerator(model_name=model_name, device=device)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/ingestion/embeddings.py:31: in __init__
+    self.model = SentenceTransformer(model_name, device=device)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.13/site-packages/sentence_transformers/SentenceTransformer.py:339: in __init__
+    modules = self._load_auto_model(
+venv/lib/python3.13/site-packages/sentence_transformers/SentenceTransformer.py:2112: in _load_auto_model
+    transformer_model = Transformer(
+venv/lib/python3.13/site-packages/sentence_transformers/models/Transformer.py:87: in __init__
+    config, is_peft_model = self._load_config(model_name_or_path, cache_dir, backend, config_args)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.13/site-packages/sentence_transformers/models/Transformer.py:138: in _load_config
+    find_adapter_config_file(
+venv/lib/python3.13/site-packages/transformers/utils/peft_utils.py:88: in find_adapter_config_file
+    adapter_cached_filename = cached_file(
+venv/lib/python3.13/site-packages/transformers/utils/hub.py:322: in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.13/site-packages/transformers/utils/hub.py:511: in cached_files
+    raise OSError(
+E   OSError: sentence-transformers/test-model is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+E   If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth login` or by passing `token=&lt;your_token&gt;`</failure></testcase><testcase classname="tests.test_ingestion_fixed.TestIngestionPipeline" name="test_ingestion_pipeline_init" time="0.002" /><testcase classname="tests.test_ingestion_fixed.TestIngestionPipeline" name="test_ingest_file" time="0.003" /><testcase classname="tests.test_ingestion_fixed.TestIngestionPipeline" name="test_ingest_directory" time="0.004"><failure message="AssertionError: assert False&#10; +  where False = isinstance({'total_files': 1, 'processed_files': 1, 'total_chunks': 3, 'failed_files': []}, int)">tests/test_ingestion_fixed.py:313: in test_ingest_directory
+    assert isinstance(result, int)
+E   AssertionError: assert False
+E    +  where False = isinstance({'total_files': 1, 'processed_files': 1, 'total_chunks': 3, 'failed_files': []}, int)</failure></testcase><testcase classname="tests.test_ingestion_fixed.TestIngestionPipeline" name="test_ingest_directory_with_pattern" time="0.004"><failure message="AssertionError: assert False&#10; +  where False = isinstance({'total_files': 1, 'processed_files': 1, 'total_chunks': 3, 'failed_files': []}, int)">tests/test_ingestion_fixed.py:337: in test_ingest_directory_with_pattern
+    assert isinstance(result, int)
+E   AssertionError: assert False
+E    +  where False = isinstance({'total_files': 1, 'processed_files': 1, 'total_chunks': 3, 'failed_files': []}, int)</failure></testcase><testcase classname="tests.test_ingestion_fixed.TestCreateIngestionPipeline" name="test_create_ingestion_pipeline" time="1.497"><failure message="AssertionError: Expected 'VectorStore' to have been called once. Called 0 times.">/usr/lib/python3.13/unittest/mock.py:958: in assert_called_once
+    raise AssertionError(msg)
+E   AssertionError: Expected 'VectorStore' to have been called once. Called 0 times.
+
+During handling of the above exception, another exception occurred:
+tests/test_ingestion_fixed.py:363: in test_create_ingestion_pipeline
+    mock_vs_class.assert_called_once()
+E   AssertionError: Expected 'VectorStore' to have been called once. Called 0 times.</failure></testcase><testcase classname="tests.test_ingestion_fixed.TestIngestionEdgeCases" name="test_document_processor_empty_content" time="0.002" /><testcase classname="tests.test_ingestion_fixed.TestIngestionEdgeCases" name="test_embedding_generator_empty_documents" time="1.295"><failure message="AttributeError: 'EmbeddingGenerator' object has no attribute 'embed_documents'. Did you mean: 'encode_documents'?">tests/test_ingestion_fixed.py:392: in test_embedding_generator_empty_documents
+    result = generator.embed_documents([])
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'EmbeddingGenerator' object has no attribute 'embed_documents'. Did you mean: 'encode_documents'?</failure></testcase><testcase classname="tests.test_ingestion_fixed.TestIngestionEdgeCases" name="test_ingestion_pipeline_file_not_found" time="0.005"><failure message="Failed: DID NOT RAISE &lt;class 'FileNotFoundError'&gt;">tests/test_ingestion_fixed.py:408: in test_ingestion_pipeline_file_not_found
+    with pytest.raises(FileNotFoundError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE &lt;class 'FileNotFoundError'&gt;</failure></testcase><testcase classname="tests.test_ingestion_fixed.TestIngestionEdgeCases" name="test_ingestion_pipeline_empty_directory" time="0.007"><failure message="AssertionError: assert {'total_files': 0, 'processed_files': 0, 'total_chunks': 0, 'failed_files': []} == 0">tests/test_ingestion_fixed.py:426: in test_ingestion_pipeline_empty_directory
+    assert result == 0
+E   AssertionError: assert {'total_files': 0, 'processed_files': 0, 'total_chunks': 0, 'failed_files': []} == 0</failure></testcase><testcase classname="tests.test_ingestion_fixed.TestIngestionEdgeCases" name="test_markdown_processor_malformed_markdown" time="0.003" /><testcase classname="tests.test_ingestion_fixed.TestIngestionEdgeCases" name="test_embedding_generator_large_batch" time="2.098"><failure message="assert (1000, 384) == (1000, 2)&#10;  &#10;  At index 1 diff: 384 != 2&#10;  &#10;  Full diff:&#10;    (&#10;        1000,&#10;  -     2,&#10;  +     384,&#10;    )">tests/test_ingestion_fixed.py:446: in test_embedding_generator_large_batch
+    assert result.shape == (1000, 2)
+E   assert (1000, 384) == (1000, 2)
+E     
+E     At index 1 diff: 384 != 2
+E     
+E     Full diff:
+E       (
+E           1000,
+E     -     2,
+E     +     384,
+E       )</failure></testcase><testcase classname="tests.test_ingestion_fixed.TestIngestionIntegration" name="test_full_ingestion_workflow" time="0.005"><failure message="AssertionError: assert False&#10; +  where False = isinstance({'total_files': 1, 'processed_files': 1, 'total_chunks': 3, 'failed_files': []}, int)">tests/test_ingestion_fixed.py:474: in test_full_ingestion_workflow
+    assert isinstance(result, int)
+E   AssertionError: assert False
+E    +  where False = isinstance({'total_files': 1, 'processed_files': 1, 'total_chunks': 3, 'failed_files': []}, int)</failure></testcase><testcase classname="tests.test_ingestion_fixed.TestIngestionIntegration" name="test_document_processor_with_various_formats" time="0.001" /><testcase classname="tests.test_ingestion_fixed.TestIngestionPerformance" name="test_document_processing_performance" time="0.003" /><testcase classname="tests.test_ingestion_fixed.TestIngestionPerformance" name="test_embedding_generation_performance" time="1.453"><failure message="assert (100, 384) == (100, 4)&#10;  &#10;  At index 1 diff: 384 != 4&#10;  &#10;  Full diff:&#10;    (&#10;        100,&#10;  -     4,&#10;  +     384,&#10;  ?     ++&#10;    )">tests/test_ingestion_fixed.py:544: in test_embedding_generation_performance
+    assert result.shape == (100, 4)
+E   assert (100, 384) == (100, 4)
+E     
+E     At index 1 diff: 384 != 4
+E     
+E     Full diff:
+E       (
+E           100,
+E     -     4,
+E     +     384,
+E     ?     ++
+E       )</failure></testcase><testcase classname="tests.test_ingestion_fixed.TestIngestionPerformance" name="test_pipeline_ingestion_performance" time="0.004"><failure message="AssertionError: assert False&#10; +  where False = isinstance({'total_files': 10, 'processed_files': 10, 'total_chunks': 30, 'failed_files': []}, int)">tests/test_ingestion_fixed.py:573: in test_pipeline_ingestion_performance
+    assert isinstance(result, int)
+E   AssertionError: assert False
+E    +  where False = isinstance({'total_files': 10, 'processed_files': 10, 'total_chunks': 30, 'failed_files': []}, int)</failure></testcase></testsuite></testsuites>

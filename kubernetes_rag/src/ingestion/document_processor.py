@@ -262,3 +262,7 @@ class KubernetesDocProcessor:
                 print(f"Error processing {md_file}: {e}")
 
         return all_documents
+
+
+# Backwards compatibility alias
+DocumentProcessor = KubernetesDocProcessor

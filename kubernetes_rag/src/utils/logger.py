@@ -30,7 +30,19 @@ def setup_logger(log_level: str = "INFO", log_file: str | None = None):
         colorize=True,
     )
 
-    # Add file logger if specified
+    # Structured JSON file sink — machine-readable for log aggregation
+    json_log_path = Path("logs/rag.jsonl")
+    json_log_path.parent.mkdir(parents=True, exist_ok=True)
+    logger.add(
+        str(json_log_path),
+        serialize=True,  # loguru JSON serialization
+        level=log_level,
+        rotation="50 MB",
+        retention="7 days",
+        compression="gz",
+    )
+
+    # Add additional plain-text file logger if specified
     if log_file:
         log_path = Path(log_file)
         log_path.parent.mkdir(parents=True, exist_ok=True)

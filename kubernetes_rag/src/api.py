@@ -411,6 +411,7 @@ async def stats_endpoint():
         )
 
         stats = vector_store.get_collection_stats()
+        RAG_COLLECTION_DOCS.set(stats["count"])
 
         return {
             "collection_name": stats["name"],

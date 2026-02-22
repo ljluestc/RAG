@@ -1,7 +1,9 @@
 """LLM integration for answer generation."""
 
 import os
+import re
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..utils.logger import get_logger
@@ -9,8 +11,43 @@ from ..utils.logger import get_logger
 logger = get_logger()
 
 
+def estimate_tokens(text: str) -> int:
+    """Rough token estimate (~4 chars per token for English)."""
+    return max(1, len(text) // 4)
+
+
+def build_source_url(source_path: str, filename: str) -> Optional[str]:
+    """Build a web URL from a source path.
+
+    - arXiv papers  → https://arxiv.org/abs/<id>
+    - devops-exercises → GitHub blob link
+    - Otherwise → None
+    """
+    if not source_path:
+        return None
+
+    # arXiv papers: extract ID from filename like "2106.09685v2.pdf"
+    if "arxiv_papers" in source_path:
+        stem = Path(source_path).stem  # e.g. "2106.09685v2"
+        # Strip version suffix for cleaner URL
+        arxiv_id = re.sub(r"v\d+$", "", stem)
+        return f"https://arxiv.org/abs/{arxiv_id}"
+
+    # DevOps exercises: map local clone path to GitHub URL
+    if "devops_exercises" in source_path or "devops-exercises" in source_path:
+        # Find the path after "topics/"
+        m = re.search(r"topics/(.+)$", source_path)
+        if m:
+            relative = m.group(1)
+            return f"https://github.com/bregman-arie/devops-exercises/blob/master/topics/{relative}"
+
+    return None
+
+
 class LLMBase(ABC):
     """Base class for LLM providers."""
+
+    model: str = "unknown"
 
     @abstractmethod
     def generate(
@@ -18,6 +55,10 @@ class LLMBase(ABC):
     ) -> str:
         """Generate text from prompt."""
         pass
+
+    def get_model_name(self) -> str:
+        """Return the model identifier."""
+        return getattr(self, "model", "unknown")
 
 
 class OpenAILLM(LLMBase):
@@ -50,7 +91,7 @@ class OpenAILLM(LLMBase):
     ) -> str:
         """Generate text using OpenAI."""
         if self.client is None:
-            # Mock response for testing
+            self.last_usage = {"input_tokens": 0, "output_tokens": 0}
             return "This is a mock response for testing purposes."
 
         try:
@@ -67,6 +108,12 @@ class OpenAILLM(LLMBase):
                 max_tokens=max_tokens,
             )
 
+            if response.usage:
+                self.last_usage = {
+                    "input_tokens": response.usage.prompt_tokens,
+                    "output_tokens": response.usage.completion_tokens,
+                }
+
             return response.choices[0].message.content
 
         except Exception as e:
@@ -78,12 +125,12 @@ class AnthropicLLM(LLMBase):
     """Anthropic Claude LLM provider."""
 
     def __init__(
-        self, api_key: Optional[str] = None, model: str = "claude-3-sonnet-20240229"
+        self, api_key: Optional[str] = None, model: str = "claude-sonnet-4-20250514"
     ):
         """Initialize Anthropic LLM."""
         import anthropic
 
-        self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
+        self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_KEY")
         if not self.api_key:
             # In test mode, use a mock client
             if os.getenv("TESTING") == "true":
@@ -106,7 +153,7 @@ class AnthropicLLM(LLMBase):
     ) -> str:
         """Generate text using Anthropic."""
         if self.client is None:
-            # Mock response for testing
+            self.last_usage = {"input_tokens": 0, "output_tokens": 0}
             return "This is a mock response for testing purposes."
 
         try:
@@ -116,6 +163,11 @@ class AnthropicLLM(LLMBase):
                 temperature=temperature,
                 messages=[{"role": "user", "content": prompt}],
             )
+
+            self.last_usage = {
+                "input_tokens": message.usage.input_tokens,
+                "output_tokens": message.usage.output_tokens,
+            }
 
             return message.content[0].text
 
@@ -172,7 +224,7 @@ class RAGGenerator:
         include_sources: bool = True,
     ) -> Dict[str, Any]:
         """
-        Generate answer using retrieved documents.
+        Generate answer using retrieved documents with citation grounding.
 
         Args:
             query: User query
@@ -182,12 +234,20 @@ class RAGGenerator:
             include_sources: Include source references
 
         Returns:
-            Dictionary with answer and metadata
+            Dictionary with answer, citations, and metadata
         """
-        # Build context from retrieved documents
-        context = self._build_context(retrieved_docs)
+        # Build citation grounding first so we can use citation IDs in the prompt
+        citations = self._extract_citations(retrieved_docs)
 
-        # Create prompt
+        # Build a mapping from source path -> citation ID for context labeling
+        source_to_cid: Dict[str, int] = {}
+        for c in citations:
+            source_to_cid[c["source"]] = c["citation_id"]
+
+        # Build context from retrieved documents using citation IDs
+        context = self._build_context(retrieved_docs, source_to_cid)
+
+        # Create prompt with citation instructions
         prompt = self._create_prompt(query, context)
 
         logger.info("Generating answer with LLM")
@@ -197,7 +257,30 @@ class RAGGenerator:
             prompt, temperature=temperature, max_tokens=max_tokens
         )
 
-        result = {"query": query, "answer": answer, "num_sources": len(retrieved_docs)}
+        # Post-process: normalise any remaining [Document N] references
+        answer = self._normalize_citation_refs(answer, retrieved_docs, source_to_cid)
+
+        # Use real token counts from LLM if available, otherwise estimate
+        usage = getattr(self.llm, "last_usage", None)
+        if usage:
+            prompt_tokens = usage.get("input_tokens", 0)
+            completion_tokens = usage.get("output_tokens", 0)
+        else:
+            prompt_tokens = estimate_tokens(prompt)
+            completion_tokens = estimate_tokens(answer)
+
+        result = {
+            "query": query,
+            "answer": answer,
+            "num_sources": len(retrieved_docs),
+            "citations": citations,
+            "model_used": self.llm.get_model_name(),
+            "tokens_used": {
+                "prompt": prompt_tokens,
+                "completion": completion_tokens,
+                "total": prompt_tokens + completion_tokens,
+            },
+        }
 
         if include_sources:
             result["sources"] = [
@@ -211,23 +294,98 @@ class RAGGenerator:
 
         return result
 
-    def _build_context(self, retrieved_docs: List[Dict[str, Any]]) -> str:
-        """Build context string from retrieved documents."""
-        context_parts = []
+    def _extract_citations(self, retrieved_docs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Extract structured citations, deduplicated by source file.
 
-        for i, doc in enumerate(retrieved_docs, 1):
-            content = doc["content"]
+        Multiple chunks from the same file are merged into one citation
+        keeping the highest relevance score and best section title.
+        """
+        # Group by (source_path) — keep highest-scoring entry per file
+        best_by_source: Dict[str, Dict[str, Any]] = {}
+        for doc in retrieved_docs:
+            meta = doc.get("metadata", {})
+            source_path = meta.get("source", "unknown")
             score = doc.get("score", 0.0)
 
+            existing = best_by_source.get(source_path)
+            if existing is None or score > existing["relevance_score"]:
+                filename = meta.get("filename", "unknown")
+                best_by_source[source_path] = {
+                    "source": source_path,
+                    "filename": filename,
+                    "doc_type": meta.get("type", "unknown"),
+                    "chunk_index": meta.get("chunk_index", 0),
+                    "section_title": meta.get("section_title", None),
+                    "page_number": meta.get("page_number", None),
+                    "relevance_score": score,
+                    "passage": doc["content"][:300],
+                    "url": build_source_url(source_path, filename),
+                }
+            elif existing is not None and score == existing["relevance_score"]:
+                # Same score — prefer the one with a section title
+                if not existing.get("section_title") and meta.get("section_title"):
+                    existing["section_title"] = meta["section_title"]
+
+        # Sort by relevance descending, assign citation IDs
+        sorted_citations = sorted(
+            best_by_source.values(), key=lambda c: c["relevance_score"], reverse=True
+        )
+        for i, c in enumerate(sorted_citations, 1):
+            c["citation_id"] = i
+
+        return sorted_citations
+
+    def _build_context(
+        self,
+        retrieved_docs: List[Dict[str, Any]],
+        source_to_cid: Optional[Dict[str, int]] = None,
+    ) -> str:
+        """Build context string from retrieved documents.
+
+        Each chunk is labelled with [Source N] where N is the citation ID so the
+        LLM can reference sources that map directly to the citation panel.
+        """
+        context_parts = []
+
+        for doc in retrieved_docs:
+            content = doc["content"]
+            score = doc.get("score", 0.0)
+            meta = doc.get("metadata", {})
+            source_path = meta.get("source", "unknown")
+            filename = meta.get("filename", "unknown")
+            section = meta.get("section_title", "")
+
+            cid = (source_to_cid or {}).get(source_path)
+            label = f"Source {cid}" if cid else filename
+            section_hint = f" — {section}" if section else ""
+
             context_parts.append(
-                f"[Document {i}] (Relevance: {score:.2f})\n{content}\n"
+                f"[{label}{section_hint}] (Relevance: {score:.2f})\n{content}\n"
             )
 
         return "\n".join(context_parts)
 
+    @staticmethod
+    def _normalize_citation_refs(
+        answer: str,
+        retrieved_docs: List[Dict[str, Any]],
+        source_to_cid: Dict[str, int],
+    ) -> str:
+        """Replace any leftover [Document N] references with [Source <cid>]."""
+        def _replace(m: re.Match) -> str:
+            idx = int(m.group(1)) - 1  # 0-based
+            if 0 <= idx < len(retrieved_docs):
+                src = retrieved_docs[idx].get("metadata", {}).get("source", "")
+                cid = source_to_cid.get(src)
+                if cid:
+                    return f"[Source {cid}]"
+            return m.group(0)
+
+        return re.sub(r"\[Document\s+(\d+)\]", _replace, answer)
+
     def _create_prompt(self, query: str, context: str) -> str:
-        """Create prompt for LLM."""
-        prompt_template = """You are a Kubernetes expert assistant. Answer the user's question based on the provided context from Kubernetes documentation.
+        """Create prompt for LLM with citation grounding instructions."""
+        prompt_template = """You are a knowledgeable assistant. Answer the user's question based on the provided context documents.
 
 Context:
 {context}
@@ -236,10 +394,11 @@ User Question: {query}
 
 Instructions:
 1. Answer the question based primarily on the provided context
-2. Be concise and accurate
-3. If the context doesn't contain enough information, acknowledge this
-4. Include specific Kubernetes concepts, commands, or examples when relevant
-5. Format your answer clearly with proper markdown if needed
+2. Cite your sources using the [Source N] labels shown above (e.g. [Source 1], [Source 3])
+3. Be concise and accurate
+4. If the context doesn't contain enough information, acknowledge this
+5. Include specific concepts, commands, or examples when relevant
+6. Format your answer clearly with proper markdown if needed
 
 Answer:"""
 

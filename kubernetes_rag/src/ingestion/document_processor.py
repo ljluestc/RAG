@@ -1,11 +1,13 @@
 """Document processing and chunking for Kubernetes documentation."""
 
 import re
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List
 
 import markdown
+import pdfplumber
 from bs4 import BeautifulSoup
 
 
@@ -134,7 +136,7 @@ class DocumentChunker:
                 Document(
                     content=chunk,
                     metadata=doc_metadata,
-                    chunk_id=f"{metadata.get('source', 'unknown')}_{i}",
+                    chunk_id=f"{metadata.get('source', 'unknown')}_{i}_{uuid.uuid4().hex[:8]}",
                 )
             )
 
@@ -182,7 +184,7 @@ class DocumentChunker:
                 doc_metadata["section_level"] = section["level"]
 
                 source_name = metadata.get("source", "unknown")
-                chunk_id = f"{source_name}_{section['title']}"
+                chunk_id = f"{source_name}_{section['title']}_{uuid.uuid4().hex[:8]}"
                 documents.append(
                     Document(
                         content=section_text,
@@ -260,6 +262,97 @@ class KubernetesDocProcessor:
                 all_documents.extend(docs)
             except Exception as e:
                 print(f"Error processing {md_file}: {e}")
+
+        return all_documents
+
+
+class PDFProcessor:
+    """Process PDF files into document chunks."""
+
+    def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 200):
+        self.chunker = DocumentChunker(chunk_size, chunk_overlap)
+
+    def process_file(self, file_path: Path) -> List[Document]:
+        """Process a PDF file into document chunks."""
+        documents = []
+        file_path = Path(file_path)
+
+        with pdfplumber.open(file_path) as pdf:
+            global_chunk_idx = 0
+            for page_num, page in enumerate(pdf.pages, 1):
+                text = page.extract_text()
+                if not text or not text.strip():
+                    continue
+
+                metadata = {
+                    "source": str(file_path),
+                    "filename": file_path.name,
+                    "type": "pdf",
+                    "page_number": page_num,
+                    "total_pages": len(pdf.pages),
+                }
+
+                # Chunk the page text
+                page_docs = self.chunker.chunk_text(text, metadata)
+                # Ensure unique chunk IDs across pages
+                for doc in page_docs:
+                    doc.chunk_id = f"{file_path.stem}_p{page_num}_{global_chunk_idx}"
+                    global_chunk_idx += 1
+                documents.extend(page_docs)
+
+        return documents
+
+    def process_directory(self, directory: Path) -> List[Document]:
+        """Process all PDF files in a directory."""
+        all_documents = []
+
+        for pdf_file in Path(directory).rglob("*.pdf"):
+            try:
+                docs = self.process_file(pdf_file)
+                all_documents.extend(docs)
+            except Exception as e:
+                print(f"Error processing {pdf_file}: {e}")
+
+        return all_documents
+
+
+class UnifiedDocProcessor:
+    """Unified processor that handles both markdown and PDF files."""
+
+    def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 200):
+        self.md_processor = KubernetesDocProcessor(chunk_size, chunk_overlap)
+        self.pdf_processor = PDFProcessor(chunk_size, chunk_overlap)
+
+    def process_file(self, file_path: Path) -> List[Document]:
+        """Process a file based on its extension."""
+        file_path = Path(file_path)
+        suffix = file_path.suffix.lower()
+
+        if suffix == ".pdf":
+            return self.pdf_processor.process_file(file_path)
+        elif suffix in (".md", ".markdown", ".txt"):
+            return self.md_processor.process_file(file_path)
+        else:
+            raise ValueError(f"Unsupported file type: {suffix}")
+
+    def process_directory(self, directory: Path) -> List[Document]:
+        """Process all supported files in a directory."""
+        all_documents = []
+        directory = Path(directory)
+
+        for f in directory.rglob("*"):
+            if f.suffix.lower() in (".md", ".markdown", ".txt"):
+                try:
+                    docs = self.md_processor.process_file(f)
+                    all_documents.extend(docs)
+                except Exception as e:
+                    print(f"Error processing {f}: {e}")
+            elif f.suffix.lower() == ".pdf":
+                try:
+                    docs = self.pdf_processor.process_file(f)
+                    all_documents.extend(docs)
+                except Exception as e:
+                    print(f"Error processing {f}: {e}")
 
         return all_documents
 

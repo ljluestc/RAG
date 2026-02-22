@@ -17,6 +17,7 @@ loguru>=0.7.2
 
 # Document processing
 markdown>=3.5.1
+pdfplumber>=0.10.0
 mypy>=1.0.0
 numpy>=1.24.3
 
@@ -45,3 +46,14 @@ torch>=2.2.0
 tqdm>=4.66.1
 transformers>=4.36.2
 uvicorn>=0.27.0
+
+# Bot integrations
+slack-bolt>=1.18.0
+slack-sdk>=3.26.0
+discord.py>=2.3.0
+
+# Data pipeline / Airflow (install separately: pip install apache-airflow)
+# apache-airflow>=2.8.0  # Heavy dep - install in its own venv
+
+# PDF processing
+pdfplumber>=0.10.0

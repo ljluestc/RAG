@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from ..retrieval.vector_store import VectorStore
 from ..utils.logger import get_logger
-from .document_processor import KubernetesDocProcessor
+from .document_processor import KubernetesDocProcessor, UnifiedDocProcessor
 from .embeddings import EmbeddingGenerator
 
 logger = get_logger()
@@ -37,7 +37,7 @@ class IngestionPipeline:
 
     def ingest_file(self, file_path: Path) -> int:
         """
-        Ingest a single file.
+        Ingest a single file (markdown or PDF).
 
         Args:
             file_path: Path to the file
@@ -46,9 +46,18 @@ class IngestionPipeline:
             Number of documents ingested
         """
         logger.info(f"Processing file: {file_path}")
+        file_path = Path(file_path)
 
-        # Process document
-        documents = self.doc_processor.process_file(file_path)
+        # Use unified processor for PDF files, original for MD
+        if file_path.suffix.lower() == ".pdf":
+            from .document_processor import PDFProcessor
+            pdf_proc = PDFProcessor(
+                chunk_size=self.doc_processor.chunker.chunk_size,
+                chunk_overlap=self.doc_processor.chunker.chunk_overlap,
+            )
+            documents = pdf_proc.process_file(file_path)
+        else:
+            documents = self.doc_processor.process_file(file_path)
 
         if not documents:
             logger.warning(f"No documents extracted from {file_path}")
@@ -67,7 +76,7 @@ class IngestionPipeline:
         logger.info(f"Successfully ingested {len(documents)} chunks from {file_path}")
         return len(documents)
 
-    def ingest_directory(self, directory: Path, file_pattern: str = "*.md") -> dict:
+    def ingest_directory(self, directory: Path, file_pattern: str = "*") -> dict:
         """
         Ingest all files from a directory.
 
@@ -84,8 +93,12 @@ class IngestionPipeline:
         if not directory.exists():
             raise ValueError(f"Directory not found: {directory}")
 
-        # Find all matching files
-        files = list(directory.rglob(file_pattern))
+        # Find all matching files (support both MD and PDF)
+        supported_extensions = {".md", ".markdown", ".txt", ".pdf"}
+        if file_pattern == "*":
+            files = [f for f in directory.rglob("*") if f.suffix.lower() in supported_extensions]
+        else:
+            files = list(directory.rglob(file_pattern))
         logger.info(f"Found {len(files)} files to process")
 
         stats = {

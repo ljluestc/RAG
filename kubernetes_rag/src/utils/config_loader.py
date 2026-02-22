@@ -99,12 +99,14 @@ class Settings(BaseSettings):
     llm_model: str = "gpt-3.5-turbo"
     vector_db_path: str = "./data/vector_db"
     collection_name: str = "kubernetes_docs"
+    testing: bool = False
     debug: bool = False
     log_level: str = "INFO"
 
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"
 
 
 def load_config(config_path: str = "config/config.yaml") -> Config:

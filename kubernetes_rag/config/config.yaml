@@ -29,8 +29,8 @@ retrieval:
 
 # LLM Configuration
 llm:
-  provider: "openai" # Options: "openai", "anthropic", "local"
-  model_name: "gpt-3.5-turbo"
+  provider: "anthropic" # Options: "openai", "anthropic", "local"
+  model_name: "claude-sonnet-4-20250514"
   temperature: 0.3
   max_tokens: 1000
 

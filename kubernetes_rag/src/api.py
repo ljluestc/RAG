@@ -1,14 +1,16 @@
 """FastAPI REST API for Kubernetes RAG system."""
 
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from .generation.llm import create_rag_generator
+from .generation.llm import RAGGenerator, create_llm, create_rag_generator
 from .ingestion.pipeline import create_ingestion_pipeline
 from .retrieval.retriever import create_retriever
 from .utils.config_loader import get_config
@@ -54,6 +56,39 @@ retriever = create_retriever(config)
 generator = create_rag_generator(config)
 pipeline = create_ingestion_pipeline(config)
 
+# Model cache for switching
+_llm_cache: Dict[str, Any] = {}
+
+AVAILABLE_MODELS = [
+    {"id": "claude-sonnet-4-20250514", "provider": "anthropic", "name": "Claude Sonnet 4"},
+    {"id": "claude-haiku-4-5-20251015", "provider": "anthropic", "name": "Claude Haiku 4.5"},
+    {"id": "gpt-4o-mini", "provider": "openai", "name": "GPT-4o Mini"},
+    {"id": "gpt-3.5-turbo", "provider": "openai", "name": "GPT-3.5 Turbo"},
+]
+
+
+def get_generator_for_model(model_id: str) -> RAGGenerator:
+    """Get or create a RAG generator for the given model."""
+    if model_id in _llm_cache:
+        return _llm_cache[model_id]
+
+    model_info = next((m for m in AVAILABLE_MODELS if m["id"] == model_id), None)
+    if not model_info:
+        raise ValueError(f"Unknown model: {model_id}")
+
+    llm = create_llm(provider=model_info["provider"], model=model_id)
+    gen = RAGGenerator(llm=llm)
+    _llm_cache[model_id] = gen
+    return gen
+
+
+# Serve chat UI
+@app.get("/chat")
+async def chat_ui():
+    """Serve the ChatGPT-style chat interface."""
+    static_dir = Path(__file__).parent / "static" / "index.html"
+    return FileResponse(static_dir, media_type="text/html")
+
 
 # Request/Response Models
 class QueryRequest(BaseModel):
@@ -65,6 +100,7 @@ class QueryRequest(BaseModel):
     temperature: float = Field(
         default=0.3, ge=0.0, le=2.0, description="LLM temperature"
     )
+    model: Optional[str] = Field(default=None, description="LLM model to use")
 
 
 class SearchRequest(BaseModel):
@@ -83,17 +119,40 @@ class IngestRequest(BaseModel):
     source_name: str = Field(default="api_upload", description="Source identifier")
 
 
+class CitationResponse(BaseModel):
+    citation_id: int
+    source: str
+    filename: str
+    doc_type: str
+    chunk_index: int
+    section_title: Optional[str] = None
+    page_number: Optional[int] = None
+    relevance_score: float
+    passage: str
+    url: Optional[str] = None
+
+
 class DocumentResponse(BaseModel):
     content: str
     metadata: Dict[str, Any]
     score: float
 
 
+class TokenUsage(BaseModel):
+    prompt: int = 0
+    completion: int = 0
+    total: int = 0
+
+
 class QueryResponse(BaseModel):
     query: str
     answer: Optional[str] = None
     documents: List[DocumentResponse]
+    citations: List[CitationResponse] = []
     num_sources: int
+    model_used: Optional[str] = None
+    tokens_used: Optional[TokenUsage] = None
+    latency_ms: Optional[float] = None
 
 
 class SearchResponse(BaseModel):
@@ -144,6 +203,7 @@ async def query_endpoint(request: QueryRequest):
     This endpoint retrieves relevant documents and optionally generates an answer.
     """
     try:
+        t0 = time.perf_counter()
         logger.info(f"Received query: {request.query}")
 
         # Retrieve documents
@@ -170,11 +230,24 @@ async def query_endpoint(request: QueryRequest):
 
         # Generate answer if requested
         if request.generate_answer:
-            answer_data = generator.generate_answer(
+            gen = generator
+            if request.model:
+                try:
+                    gen = get_generator_for_model(request.model)
+                except ValueError:
+                    raise HTTPException(status_code=400, detail=f"Unknown model: {request.model}")
+
+            answer_data = gen.generate_answer(
                 request.query, results, temperature=request.temperature
             )
             response["answer"] = answer_data["answer"]
+            response["citations"] = [
+                CitationResponse(**c) for c in answer_data.get("citations", [])
+            ]
+            response["model_used"] = answer_data.get("model_used", "")
+            response["tokens_used"] = answer_data.get("tokens_used", {})
 
+        response["latency_ms"] = round((time.perf_counter() - t0) * 1000, 1)
         return response
 
     except Exception as e:
@@ -306,6 +379,114 @@ async def stats_endpoint():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/models")
+async def models_endpoint():
+    """List available LLM models and current active model."""
+    return {
+        "models": AVAILABLE_MODELS,
+        "default": config.llm.model_name,
+        "current": generator.llm.get_model_name(),
+    }
+
+
+class ModelSwitchRequest(BaseModel):
+    provider: str = Field(..., description="Provider: openai, anthropic, local")
+    model: str = Field(..., description="Model identifier")
+
+
+@app.post("/models/switch")
+async def switch_model(request: ModelSwitchRequest):
+    """Switch the active LLM model."""
+    global generator
+    try:
+        llm = create_llm(provider=request.provider, model=request.model)
+        gen = RAGGenerator(llm=llm)
+        generator = gen
+        # Also cache it
+        _llm_cache[request.model] = gen
+        logger.info(f"Switched default model to {request.provider}/{request.model}")
+        return {"status": "ok", "provider": request.provider, "model": request.model}
+    except Exception as e:
+        logger.error(f"Failed to switch model: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# --------------- Benchmark endpoint ---------------
+
+class BenchmarkRequest(BaseModel):
+    query: str = Field(..., description="Query to benchmark")
+    models: Optional[List[str]] = Field(
+        default=None, description="Model IDs to benchmark (None = all)"
+    )
+    top_k: int = Field(default=5)
+    temperature: float = Field(default=0.3)
+
+
+@app.post("/benchmark")
+async def benchmark_endpoint(request: BenchmarkRequest):
+    """
+    Run the same query against multiple models and compare results.
+    Returns per-model answer, latency, tokens, and a summary.
+    """
+    try:
+        # Retrieve docs once (shared across models)
+        results = retriever.retrieve(request.query, top_k=request.top_k)
+        if not results:
+            raise HTTPException(status_code=404, detail="No relevant documents found")
+
+        model_ids = request.models or [m["id"] for m in AVAILABLE_MODELS]
+
+        entries = []
+        for mid in model_ids:
+            try:
+                gen = get_generator_for_model(mid)
+            except ValueError:
+                entries.append({"model": mid, "error": f"Unknown model: {mid}"})
+                continue
+
+            t0 = time.perf_counter()
+            answer_data = gen.generate_answer(
+                request.query, results, temperature=request.temperature
+            )
+            latency = round((time.perf_counter() - t0) * 1000, 1)
+
+            tokens = answer_data.get("tokens_used", {})
+            entries.append({
+                "model": mid,
+                "answer": answer_data["answer"],
+                "latency_ms": latency,
+                "tokens_used": tokens,
+                "citations": answer_data.get("citations", []),
+            })
+
+        # Build summary
+        valid = [e for e in entries if "error" not in e]
+        summary = {}
+        if valid:
+            fastest = min(valid, key=lambda e: e["latency_ms"])
+            cheapest = min(valid, key=lambda e: (e["tokens_used"] or {}).get("total", 0))
+            summary = {
+                "fastest_model": fastest["model"],
+                "fastest_latency_ms": fastest["latency_ms"],
+                "cheapest_model": cheapest["model"],
+                "cheapest_tokens": (cheapest["tokens_used"] or {}).get("total", 0),
+                "models_compared": len(valid),
+            }
+
+        return {
+            "query": request.query,
+            "results": entries,
+            "summary": summary,
+            "num_sources": len(results),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Benchmark error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/categories")
 async def categories_endpoint():
     """
@@ -356,5 +537,5 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "api:app", host=config.api.host, port=config.api.port, reload=config.api.reload
+        "src.api:app", host=config.api.host, port=config.api.port, reload=config.api.reload
     )

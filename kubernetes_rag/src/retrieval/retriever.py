@@ -78,6 +78,16 @@ class Retriever:
             logger.warning("No results found above score threshold")
             return []
 
+        # Deduplicate by content before re-ranking
+        seen_content = set()
+        deduped = []
+        for r in results:
+            key = r["content"].strip()[:200]
+            if key not in seen_content:
+                seen_content.add(key)
+                deduped.append(r)
+        results = deduped
+
         # Re-rank if enabled
         if self.use_rerank and self.reranker:
             logger.info(f"Re-ranking {len(results)} results")

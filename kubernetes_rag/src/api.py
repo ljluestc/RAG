@@ -12,6 +12,20 @@ from pydantic import BaseModel, Field
 
 from .generation.llm import RAGGenerator, create_llm, create_rag_generator
 from .ingestion.pipeline import create_ingestion_pipeline
+from .metrics import (
+    RAG_ACTIVE_MODEL,
+    RAG_BENCHMARK_RUNS,
+    RAG_CITATIONS_PER_QUERY,
+    RAG_COLLECTION_DOCS,
+    RAG_DOCUMENTS_RETRIEVED,
+    RAG_ERRORS,
+    RAG_GENERATION_LATENCY,
+    RAG_QUERY_LATENCY,
+    RAG_QUERY_TOTAL,
+    RAG_RETRIEVAL_LATENCY,
+    RAG_TOKENS_USED,
+    setup_instrumentator,
+)
 from .retrieval.retriever import create_retriever
 from .utils.config_loader import get_config
 from .utils.logger import get_logger, setup_logger
@@ -55,6 +69,10 @@ app = create_app()
 retriever = create_retriever(config)
 generator = create_rag_generator(config)
 pipeline = create_ingestion_pipeline(config)
+
+# Prometheus metrics
+setup_instrumentator(app)
+RAG_ACTIVE_MODEL.info({"model": config.llm.model_name, "provider": config.llm.provider})
 
 # Model cache for switching
 _llm_cache: Dict[str, Any] = {}
@@ -212,6 +230,8 @@ async def query_endpoint(request: QueryRequest):
         t_ret = time.perf_counter()
         results = retriever.retrieve(request.query, top_k=request.top_k)
         retrieval_ms = round((time.perf_counter() - t_ret) * 1000, 1)
+        RAG_RETRIEVAL_LATENCY.observe(retrieval_ms / 1000)
+        RAG_DOCUMENTS_RETRIEVED.observe(len(results) if results else 0)
 
         if not results:
             raise HTTPException(status_code=404, detail="No relevant documents found")
@@ -255,11 +275,27 @@ async def query_endpoint(request: QueryRequest):
             response["model_used"] = answer_data.get("model_used", "")
             response["tokens_used"] = answer_data.get("tokens_used", {})
 
-        response["latency_ms"] = round((time.perf_counter() - t0) * 1000, 1)
+        total_ms = round((time.perf_counter() - t0) * 1000, 1)
+        response["latency_ms"] = total_ms
+
+        # Record Prometheus metrics
+        model_name = response.get("model_used", "unknown")
+        RAG_QUERY_TOTAL.labels(model=model_name, status="ok").inc()
+        RAG_QUERY_LATENCY.labels(model=model_name).observe(total_ms / 1000)
+        if response.get("generation_ms"):
+            RAG_GENERATION_LATENCY.labels(model=model_name).observe(response["generation_ms"] / 1000)
+        tokens = response.get("tokens_used")
+        if tokens:
+            RAG_TOKENS_USED.labels(model=model_name, direction="prompt").inc(tokens.get("prompt", 0))
+            RAG_TOKENS_USED.labels(model=model_name, direction="completion").inc(tokens.get("completion", 0))
+        RAG_CITATIONS_PER_QUERY.observe(len(response.get("citations", [])))
+
         return response
 
     except Exception as e:
         logger.error(f"Error processing query: {e}")
+        RAG_QUERY_TOTAL.labels(model="unknown", status="error").inc()
+        RAG_ERRORS.labels(endpoint="/query", error_type=type(e).__name__).inc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -413,6 +449,7 @@ async def switch_model(request: ModelSwitchRequest):
         # Also cache it
         _llm_cache[request.model] = gen
         logger.info(f"Switched default model to {request.provider}/{request.model}")
+        RAG_ACTIVE_MODEL.info({"model": request.model, "provider": request.provider})
         return {"status": "ok", "provider": request.provider, "model": request.model}
     except Exception as e:
         logger.error(f"Failed to switch model: {e}")
@@ -437,6 +474,7 @@ async def benchmark_endpoint(request: BenchmarkRequest):
     Returns per-model answer, latency, tokens, and a summary.
     """
     try:
+        RAG_BENCHMARK_RUNS.inc()
         # Retrieve docs once (shared across models)
         results = retriever.retrieve(request.query, top_k=request.top_k)
         if not results:

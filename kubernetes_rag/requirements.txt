@@ -57,3 +57,4 @@ discord.py>=2.3.0
 
 # PDF processing
 pdfplumber>=0.10.0
+prometheus-fastapi-instrumentator>=7.0.0

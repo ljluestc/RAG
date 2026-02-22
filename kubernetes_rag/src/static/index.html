@@ -173,18 +173,19 @@ function fmtMd(text){
   text=text.replace(/(<li>[^]*?<\/li>\n?)+/g,function(m){return '<ul>'+m+'</ul>'});
   text=text.replace(/`([^`]+)`/g,'<code>$1</code>');
   text=text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
-  // Convert [Source N] and legacy [Document N] refs to clickable citation badges
-  text=text.replace(/\[(?:Source|Document)\s*(\d+)\]/gi,function(_,n){
-    return '<a class="cite-ref" data-cite="'+n+'" onclick="hlCite('+n+')" title="Jump to source #'+n+'">S'+n+'</a>';
-  });
-  // Handle comma-separated like [Source 1, Source 2] or [Document 1, Document 2]
-  text=text.replace(/\[(?:Source|Document)\s*(\d+)(?:\s*,\s*(?:Source|Document)\s*(\d+))*(?:\s*,\s*(?:Source|Document)\s*(\d+))?\]/gi,function(match){
+  // Convert [Source N], [Document N], and comma-separated variants to clickable citation badges
+  // Comma-separated FIRST: [Source 1, Source 2, 3] or [Document 1, Document 2, Document 3] or [Source 1, 2, 3]
+  text=text.replace(/\[(?:Source|Document)\s*\d+(?:\s*,\s*(?:(?:Source|Document)\s*)?\d+)+\]/gi,function(match){
     var nums=match.match(/\d+/g);
     if(!nums)return match;
     var seen={};
     return nums.filter(function(n){if(seen[n])return false;seen[n]=true;return true}).map(function(n){
       return '<a class="cite-ref" data-cite="'+n+'" onclick="hlCite('+n+')" title="Jump to source #'+n+'">S'+n+'</a>';
     }).join(' ');
+  });
+  // Single refs: [Source 1] or [Document 1]
+  text=text.replace(/\[(?:Source|Document)\s*(\d+)\]/gi,function(_,n){
+    return '<a class="cite-ref" data-cite="'+n+'" onclick="hlCite('+n+')" title="Jump to source #'+n+'">S'+n+'</a>';
   });
   text=text.replace(/\n{2,}/g,'</p><p>');
   text=text.replace(/\n/g,'<br>');
@@ -204,7 +205,13 @@ function fmtMeta(data){
   if(data.model_used)p.push('<span class="meta-item"><span class="meta-label">Model:</span> <span class="meta-value">'+esc(data.model_used)+'</span></span>');
   if(data.latency_ms!=null){
     var lcls=data.latency_ms<2000?'color:#4caf50':data.latency_ms<5000?'color:#ffc107':'color:#e94560';
-    p.push('<span class="meta-item"><span class="meta-label">Latency:</span> <span class="meta-value" style="'+lcls+'">'+data.latency_ms.toFixed(0)+'ms ('+(data.latency_ms/1000).toFixed(2)+'s)</span></span>');}
+    var parts=data.latency_ms.toFixed(0)+'ms';
+    if(data.retrieval_ms!=null||data.generation_ms!=null){
+      parts+=' <span style="color:#666">('; var segs=[];
+      if(data.retrieval_ms!=null)segs.push('retrieval '+data.retrieval_ms.toFixed(0)+'ms');
+      if(data.generation_ms!=null)segs.push('LLM '+data.generation_ms.toFixed(0)+'ms');
+      parts+=segs.join(' + ')+')</span>';}
+    p.push('<span class="meta-item"><span class="meta-label">Latency:</span> <span class="meta-value" style="'+lcls+'">'+parts+'</span></span>');}
   if(data.tokens_used){var t=data.tokens_used;var total=t.total||((t.prompt||0)+(t.completion||0));
     p.push('<span class="meta-item"><span class="meta-label">Tokens:</span> <span class="meta-value">'+total+' <span style="color:#666">('+( t.prompt||0)+' in / '+(t.completion||0)+' out)</span></span></span>');}
   if(data.num_sources)p.push('<span class="meta-item"><span class="meta-label">Sources:</span> <span class="meta-value">'+data.num_sources+' chunks</span></span>');

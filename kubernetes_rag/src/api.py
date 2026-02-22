@@ -153,6 +153,8 @@ class QueryResponse(BaseModel):
     model_used: Optional[str] = None
     tokens_used: Optional[TokenUsage] = None
     latency_ms: Optional[float] = None
+    retrieval_ms: Optional[float] = None
+    generation_ms: Optional[float] = None
 
 
 class SearchResponse(BaseModel):
@@ -207,7 +209,9 @@ async def query_endpoint(request: QueryRequest):
         logger.info(f"Received query: {request.query}")
 
         # Retrieve documents
+        t_ret = time.perf_counter()
         results = retriever.retrieve(request.query, top_k=request.top_k)
+        retrieval_ms = round((time.perf_counter() - t_ret) * 1000, 1)
 
         if not results:
             raise HTTPException(status_code=404, detail="No relevant documents found")
@@ -226,6 +230,7 @@ async def query_endpoint(request: QueryRequest):
             "query": request.query,
             "documents": documents,
             "num_sources": len(results),
+            "retrieval_ms": retrieval_ms,
         }
 
         # Generate answer if requested
@@ -237,9 +242,12 @@ async def query_endpoint(request: QueryRequest):
                 except ValueError:
                     raise HTTPException(status_code=400, detail=f"Unknown model: {request.model}")
 
+            t_gen = time.perf_counter()
             answer_data = gen.generate_answer(
                 request.query, results, temperature=request.temperature
             )
+            generation_ms = round((time.perf_counter() - t_gen) * 1000, 1)
+            response["generation_ms"] = generation_ms
             response["answer"] = answer_data["answer"]
             response["citations"] = [
                 CitationResponse(**c) for c in answer_data.get("citations", [])

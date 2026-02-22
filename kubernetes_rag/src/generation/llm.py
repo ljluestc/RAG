@@ -24,25 +24,44 @@ _GITHUB_SOURCE_MAP = {
 }
 
 
+# Map sample doc filenames to canonical documentation URLs
+_SAMPLE_DOC_URLS: Dict[str, str] = {
+    "kubernetes_basics.md": "https://kubernetes.io/docs/concepts/overview/",
+    "docker_guide.pdf": "https://docs.docker.com/get-started/overview/",
+}
+
+
 def build_source_url(source_path: str, filename: str) -> Optional[str]:
     """Build a web URL from a source path.
 
-    - arXiv papers  → https://arxiv.org/abs/<id>
-    - devops-exercises → GitHub blob link
-    - github_pdfs/<repo>/ → manjunath5496 GitHub link
-    - Otherwise → None
+    Priority:
+    1. Sample docs → mapped official documentation URLs
+    2. arXiv papers  → https://arxiv.org/abs/<id>
+    3. devops-exercises → GitHub blob link
+    4. github_pdfs/<repo>/ → manjunath5496 GitHub link
+    5. Otherwise → None
     """
     if not source_path:
         return None
 
+    # Sample / local docs: look up by filename
+    if filename and filename in _SAMPLE_DOC_URLS:
+        return _SAMPLE_DOC_URLS[filename]
+    # Also check source_path basename
+    basename = Path(source_path).name
+    if basename in _SAMPLE_DOC_URLS:
+        return _SAMPLE_DOC_URLS[basename]
+
     # arXiv papers: extract ID from filename like "2106.09685v2.pdf"
     if "arxiv_papers" in source_path:
         stem = Path(source_path).stem  # e.g. "2106.09685v2"
+        # Strip version suffix for cleaner URL
         arxiv_id = re.sub(r"v\d+$", "", stem)
         return f"https://arxiv.org/abs/{arxiv_id}"
 
     # DevOps exercises: map local clone path to GitHub URL
     if "devops_exercises" in source_path or "devops-exercises" in source_path:
+        # Find the path after "topics/"
         m = re.search(r"topics/(.+)$", source_path)
         if m:
             relative = m.group(1)
@@ -62,8 +81,6 @@ def build_source_url(source_path: str, filename: str) -> Optional[str]:
 
 class LLMBase(ABC):
     """Base class for LLM providers."""
-
-    model: str = "unknown"
 
     @abstractmethod
     def generate(
@@ -387,17 +404,43 @@ class RAGGenerator:
         retrieved_docs: List[Dict[str, Any]],
         source_to_cid: Dict[str, int],
     ) -> str:
-        """Replace any leftover [Document N] references with [Source <cid>]."""
-        def _replace(m: re.Match) -> str:
-            idx = int(m.group(1)) - 1  # 0-based
+        """Replace any leftover [Document N] references with [Source <cid>].
+
+        Handles:
+          - Single:         [Document 1]
+          - Comma-separated: [Document 1, Document 2, Document 3]
+          - Short form:      [Document 1, 2, 3]
+        """
+        def _doc_idx_to_source(idx_1based: int) -> str:
+            """Convert a 1-based Document index to [Source <cid>]."""
+            idx = idx_1based - 1  # 0-based
             if 0 <= idx < len(retrieved_docs):
                 src = retrieved_docs[idx].get("metadata", {}).get("source", "")
                 cid = source_to_cid.get(src)
                 if cid:
                     return f"[Source {cid}]"
-            return m.group(0)
+            return f"[Source {idx_1based}]"
 
-        return re.sub(r"\[Document\s+(\d+)\]", _replace, answer)
+        def _replace_group(m: re.Match) -> str:
+            """Replace a bracket group containing one or more Document refs."""
+            nums = [int(n) for n in re.findall(r"\d+", m.group(0))]
+            # Deduplicate while preserving order
+            seen: set = set()
+            unique: list = []
+            for n in nums:
+                if n not in seen:
+                    seen.add(n)
+                    unique.append(n)
+            return " ".join(_doc_idx_to_source(n) for n in unique)
+
+        # Match [Document N, Document M, ...] or [Document N, M, ...]
+        answer = re.sub(
+            r"\[Document\s+\d+(?:\s*,\s*(?:Document\s+)?\d+)*\]",
+            _replace_group,
+            answer,
+            flags=re.IGNORECASE,
+        )
+        return answer
 
     def _create_prompt(self, query: str, context: str) -> str:
         """Create prompt for LLM with citation grounding instructions."""

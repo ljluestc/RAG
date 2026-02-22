@@ -123,12 +123,6 @@ def fetch_and_ingest_github(pipeline, data_dir: Path, max_per_repo: int = 5) -> 
 
     # Save knowledge graph
     connector.save_knowledge_graph()
-    connector.save_metadata(
-        [e for repo_pdfs in [connector.list_pdfs("manjunath5496", r)
-         for r in connector.knowledge_graph and [] or []]
-         for e in repo_pdfs]
-        if False else []  # metadata already tracked in connector
-    )
 
     return stats
 

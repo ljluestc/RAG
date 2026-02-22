@@ -158,6 +158,13 @@ class GitHubPDFConnector:
         safe_name = re.sub(r"[^\w\-.]", "_", entry.filename)
         local_path = topic_dir / safe_name
 
+        # Record sanitized→original URL mapping so citations produce valid links
+        blob_url = (
+            f"https://github.com/{entry.owner}/{entry.repo}"
+            f"/blob/master/{quote(entry.filename)}"
+        )
+        self._save_url_mapping(str(local_path), blob_url)
+
         if local_path.exists():
             logger.info(f"Already downloaded: {local_path}")
             entry.local_path = str(local_path)
@@ -176,6 +183,18 @@ class GitHubPDFConnector:
         entry.local_path = str(local_path)
         logger.info(f"Downloaded to: {local_path}")
         return local_path
+
+    def _save_url_mapping(self, local_path: str, blob_url: str):
+        """Persist sanitized-filename → original GitHub URL mapping."""
+        map_file = self.download_dir / ".url_map.json"
+        mapping: Dict[str, str] = {}
+        if map_file.exists():
+            try:
+                mapping = json.loads(map_file.read_text())
+            except (json.JSONDecodeError, OSError):
+                pass
+        mapping[local_path] = blob_url
+        map_file.write_text(json.dumps(mapping, indent=2))
 
     def ingest_pdf(self, entry: PDFEntry, pipeline=None) -> int:
         """Ingest a single PDF into the RAG system."""

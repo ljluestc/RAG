@@ -16,13 +16,6 @@ def estimate_tokens(text: str) -> int:
     return max(1, len(text) // 4)
 
 
-# Map of local data directory names to their GitHub source repos.
-_GITHUB_SOURCE_MAP = {
-    "devops_exercises": "https://github.com/bregman-arie/devops-exercises/blob/master/topics/{relative}",
-    "devops-exercises": "https://github.com/bregman-arie/devops-exercises/blob/master/topics/{relative}",
-    "github_pdfs": "https://github.com/manjunath5496/{repo}/blob/master/{filename}",
-}
-
 
 # Map sample doc filenames to canonical documentation URLs
 _SAMPLE_DOC_URLS: Dict[str, str] = {
@@ -31,51 +24,75 @@ _SAMPLE_DOC_URLS: Dict[str, str] = {
 }
 
 
+# Cached URL mapping from github_pdf_connector downloads
+_url_map_cache: Dict[str, str] = {}
+_url_map_loaded = False
+
+
+def _load_url_map() -> Dict[str, str]:
+    """Load the sanitized→original URL mapping written by GitHubPDFConnector."""
+    global _url_map_cache, _url_map_loaded
+    if _url_map_loaded:
+        return _url_map_cache
+    _url_map_loaded = True
+    import json
+    for candidate in (Path("data/github_pdfs/.url_map.json"), Path("./data/github_pdfs/.url_map.json")):
+        if candidate.exists():
+            try:
+                _url_map_cache = json.loads(candidate.read_text())
+            except (json.JSONDecodeError, OSError):
+                pass
+            break
+    return _url_map_cache
+
+
 def build_source_url(source_path: str, filename: str) -> Optional[str]:
     """Build a web URL from a source path.
 
+    Only returns a URL when the mapping is reliable.  If no valid URL
+    can be determined the function returns None so the UI renders the
+    citation as plain text (no broken link).
+
     Priority:
-    1. Sample docs → mapped official documentation URLs
-    2. arXiv papers  → https://arxiv.org/abs/<id>
-    3. devops-exercises → GitHub blob link
-    4. github_pdfs/<repo>/ → manjunath5496 GitHub link
+    1. URL mapping file (exact match from download step)
+    2. Sample docs → mapped official documentation URLs
+    3. arXiv papers  → https://arxiv.org/abs/<id>
+    4. devops-exercises → GitHub blob link
     5. Otherwise → None
     """
     if not source_path:
         return None
 
-    # Sample / local docs: look up by filename
+    # 1. URL mapping file — most reliable for GitHub PDFs
+    url_map = _load_url_map()
+    if source_path in url_map:
+        return url_map[source_path]
+    # Also try matching just the tail (github_pdfs/<topic>/<file>)
+    for key, url in url_map.items():
+        if source_path.endswith(key) or key.endswith(source_path):
+            return url
+
+    # 2. Sample / local docs: look up by filename
     if filename and filename in _SAMPLE_DOC_URLS:
         return _SAMPLE_DOC_URLS[filename]
-    # Also check source_path basename
     basename = Path(source_path).name
     if basename in _SAMPLE_DOC_URLS:
         return _SAMPLE_DOC_URLS[basename]
 
-    # arXiv papers: extract ID from filename like "2106.09685v2.pdf"
+    # 3. arXiv papers: extract ID from filename like "2106.09685v2.pdf"
     if "arxiv_papers" in source_path:
-        stem = Path(source_path).stem  # e.g. "2106.09685v2"
-        # Strip version suffix for cleaner URL
+        stem = Path(source_path).stem
         arxiv_id = re.sub(r"v\d+$", "", stem)
         return f"https://arxiv.org/abs/{arxiv_id}"
 
-    # DevOps exercises: map local clone path to GitHub URL
+    # 4. DevOps exercises: map local clone path to GitHub URL
     if "devops_exercises" in source_path or "devops-exercises" in source_path:
-        # Find the path after "topics/"
         m = re.search(r"topics/(.+)$", source_path)
         if m:
             relative = m.group(1)
             return f"https://github.com/bregman-arie/devops-exercises/blob/master/topics/{relative}"
 
-    # GitHub PDF collections (manjunath5496 repos)
-    if "github_pdfs" in source_path:
-        # Expected path: .../github_pdfs/<repo_name>/filename.pdf
-        m = re.search(r"github_pdfs/([^/]+)/(.+)$", source_path)
-        if m:
-            repo = m.group(1)
-            fname = m.group(2)
-            return f"https://github.com/manjunath5496/{repo}/blob/master/{fname}"
-
+    # 5. No reliable URL — return None so UI shows as plain text
     return None
 
 

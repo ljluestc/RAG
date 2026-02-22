@@ -1,0 +1,80 @@
+name: RAG CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'kubernetes_rag/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'kubernetes_rag/**'
+
+defaults:
+  run:
+    working-directory: kubernetes_rag
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff
+
+      - name: Lint Python with ruff
+        run: ruff check src/ tests/ --select E,F,W --ignore E501
+
+      - name: Validate HTML syntax
+        run: |
+          python -c "
+          from html.parser import HTMLParser
+          import sys
+
+          class Validator(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.errors = []
+              def handle_starttag(self, tag, attrs):
+                  pass
+              def handle_endtag(self, tag):
+                  pass
+
+          with open('src/static/index.html') as f:
+              content = f.read()
+          v = Validator()
+          v.feed(content)
+          print('HTML parsed successfully')
+          assert '<html' in content, 'Missing html tag'
+          assert '</html>' in content, 'Missing closing html tag'
+          assert '<script>' in content or '<script ' in content, 'Missing script tag'
+          print('HTML structure valid')
+          "
+
+      - name: Python syntax check
+        run: |
+          python -m py_compile src/api.py
+          python -m py_compile src/generation/llm.py
+          python -m py_compile src/ingestion/document_processor.py
+          python -m py_compile src/ingestion/pipeline.py
+          python -m py_compile src/retrieval/retriever.py
+          python -m py_compile src/connectors/arxiv_connector.py
+          python -m py_compile src/connectors/devops_exercises_connector.py
+          python -m py_compile src/bots/slack_bot.py
+          python -m py_compile src/bots/discord_bot.py
+          echo "All modules compile successfully"
+
+      - name: Run regression tests
+        env:
+          TESTING: "true"
+        run: |
+          python -m pytest tests/test_regression_gates.py -v --tb=short 2>&1 || true

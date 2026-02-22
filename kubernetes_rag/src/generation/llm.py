@@ -16,11 +16,20 @@ def estimate_tokens(text: str) -> int:
     return max(1, len(text) // 4)
 
 
+# Map of local data directory names to their GitHub source repos.
+_GITHUB_SOURCE_MAP = {
+    "devops_exercises": "https://github.com/bregman-arie/devops-exercises/blob/master/topics/{relative}",
+    "devops-exercises": "https://github.com/bregman-arie/devops-exercises/blob/master/topics/{relative}",
+    "github_pdfs": "https://github.com/manjunath5496/{repo}/blob/master/{filename}",
+}
+
+
 def build_source_url(source_path: str, filename: str) -> Optional[str]:
     """Build a web URL from a source path.
 
     - arXiv papers  → https://arxiv.org/abs/<id>
     - devops-exercises → GitHub blob link
+    - github_pdfs/<repo>/ → manjunath5496 GitHub link
     - Otherwise → None
     """
     if not source_path:
@@ -29,17 +38,24 @@ def build_source_url(source_path: str, filename: str) -> Optional[str]:
     # arXiv papers: extract ID from filename like "2106.09685v2.pdf"
     if "arxiv_papers" in source_path:
         stem = Path(source_path).stem  # e.g. "2106.09685v2"
-        # Strip version suffix for cleaner URL
         arxiv_id = re.sub(r"v\d+$", "", stem)
         return f"https://arxiv.org/abs/{arxiv_id}"
 
     # DevOps exercises: map local clone path to GitHub URL
     if "devops_exercises" in source_path or "devops-exercises" in source_path:
-        # Find the path after "topics/"
         m = re.search(r"topics/(.+)$", source_path)
         if m:
             relative = m.group(1)
             return f"https://github.com/bregman-arie/devops-exercises/blob/master/topics/{relative}"
+
+    # GitHub PDF collections (manjunath5496 repos)
+    if "github_pdfs" in source_path:
+        # Expected path: .../github_pdfs/<repo_name>/filename.pdf
+        m = re.search(r"github_pdfs/([^/]+)/(.+)$", source_path)
+        if m:
+            repo = m.group(1)
+            fname = m.group(2)
+            return f"https://github.com/manjunath5496/{repo}/blob/master/{fname}"
 
     return None
 

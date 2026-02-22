@@ -47,6 +47,11 @@ data/processed/*
 !data/processed/.gitkeep
 data/vector_db/*
 !data/vector_db/.gitkeep
+data/github_pdfs/
+data/arxiv_papers/
+data/devops_exercises/
+data/sample_docs/
+data/test_vector_db/
 
 # Logs
 *.log

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChatGPT Admin — Agent Monitor</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a0a;--card:#141414;--card2:#1a1a1a;--accent:#10a37f;--accent2:#9333ea;
+      --danger:#ef4444;--warn:#f59e0b;--text:#e5e5e5;--dim:#888;--muted:#555;--border:#262626;--radius:12px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── Header ── */
+.top-bar{background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:16px}
+.top-bar h1{font-size:18px;font-weight:600}
+.top-bar .badge{font-size:11px;background:var(--accent);color:#fff;padding:2px 10px;border-radius:12px}
+.top-bar .right{margin-left:auto;display:flex;align-items:center;gap:12px;font-size:12px;color:var(--dim)}
+.top-bar .refresh-btn{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:6px 14px;
+                       border-radius:8px;cursor:pointer;font-size:12px}
+.top-bar .refresh-btn:hover{border-color:var(--accent)}
+.back-link{color:var(--accent);text-decoration:none;font-size:13px}
+
+/* ── Grid ── */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;padding:20px 24px}
+.grid-full{grid-column:1/-1}
+
+/* ── Cards ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.card-header h2{font-size:14px;font-weight:600}
+.card-header .indicator{width:8px;height:8px;border-radius:50%}
+.card-header .indicator.green{background:#22c55e}
+.card-header .indicator.yellow{background:var(--warn)}
+.card-header .indicator.red{background:var(--danger)}
+.card-body{padding:16px 18px}
+
+/* ── Stats row ── */
+.stats-row{display:flex;gap:20px;flex-wrap:wrap}
+.stat{flex:1;min-width:120px}
+.stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.stat-value{font-size:22px;font-weight:700;color:var(--accent)}
+.stat-value.warn{color:var(--warn)}
+.stat-value.danger{color:var(--danger)}
+.stat-sub{font-size:11px;color:var(--dim);margin-top:2px}
+
+/* ── Agent list ── */
+.agent-table{width:100%;border-collapse:collapse;font-size:13px}
+.agent-table th{text-align:left;padding:10px 14px;color:var(--dim);font-weight:500;font-size:11px;
+                text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+.agent-table td{padding:10px 14px;border-bottom:1px solid var(--border)}
+.agent-table tr:last-child td{border-bottom:none}
+.agent-table tr:hover td{background:var(--card2)}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.status-dot.online{background:#22c55e}
+.status-dot.degraded{background:var(--warn)}
+.status-dot.offline{background:var(--danger)}
+.agent-host{color:var(--accent);font-family:monospace;font-size:12px}
+.agent-model{color:var(--accent2);font-size:12px}
+
+/* ── SQL / query log ── */
+.query-log{max-height:300px;overflow-y:auto}
+.query-item{padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px}
+.query-item:last-child{border-bottom:none}
+.query-sql{font-family:'SF Mono',Consolas,monospace;color:var(--accent2);margin-bottom:4px;word-break:break-all}
+.query-meta{display:flex;gap:12px;color:var(--dim);font-size:11px}
+.query-meta .slow{color:var(--danger)}
+
+/* ── Token chart placeholder ── */
+.chart-placeholder{height:200px;display:flex;align-items:center;justify-content:center;color:var(--muted);
+                   background:var(--card2);border-radius:8px;font-size:13px}
+.bar-chart{display:flex;align-items:flex-end;gap:6px;height:160px;padding:10px 0}
+.bar{flex:1;background:var(--accent);border-radius:4px 4px 0 0;min-width:24px;position:relative;transition:height .3s}
+.bar:hover{background:var(--accent2)}
+.bar-label{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--dim);white-space:nowrap}
+.bar-value{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text)}
+
+/* ── Network ── */
+.net-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.net-row:last-child{border-bottom:none}
+.net-label{color:var(--dim)}
+.net-value{font-family:monospace;color:var(--accent)}
+
+/* ── Responsive ── */
+@media(max-width:768px){.grid{grid-template-columns:1fr;padding:12px}}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <a href="/" class="back-link">← Chat</a>
+  <h1>Admin Dashboard</h1>
+  <span class="badge" id="agent-count">0 agents</span>
+  <div class="right">
+    <span id="last-refresh">—</span>
+    <button class="refresh-btn" onclick="refreshAll()">↻ Refresh</button>
+  </div>
+</div>
+
+<div class="grid" id="dashboard">
+  <!-- ── Overview Stats ── -->
+  <div class="card grid-full">
+    <div class="card-header"><div class="indicator green"></div><h2>System Overview</h2></div>
+    <div class="card-body">
+      <div class="stats-row" id="overview-stats">
+        <div class="stat"><div class="stat-label">Total Agents</div><div class="stat-value" id="s-agents">—</div></div>
+        <div class="stat"><div class="stat-label">Online</div><div class="stat-value" id="s-online">—</div></div>
+        <div class="stat"><div class="stat-label">Total Conversations</div><div class="stat-value" id="s-convos">—</div></div>
+        <div class="stat"><div class="stat-label">Active WebSockets</div><div class="stat-value" id="s-ws">—</div></div>
+        <div class="stat"><div class="stat-label">Tokens Today</div><div class="stat-value" id="s-tokens">—</div><div class="stat-sub" id="s-token-cost"></div></div>
+        <div class="stat"><div class="stat-label">Avg Latency</div><div class="stat-value" id="s-latency">—</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Agent Fleet ── -->
+  <div class="card grid-full">
+    <div class="card-header"><h2>Deployed Agents</h2></div>
+    <div class="card-body" style="padding:0">
+      <table class="agent-table">
+        <thead><tr>
+          <th>Status</th><th>Agent ID</th><th>Host / IP</th><th>Model</th>
+          <th>Uptime</th><th>Req/min</th><th>Tokens</th><th>Latency</th><th>Errors</th>
+        </tr></thead>
+        <tbody id="agent-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Token Usage Chart ── -->
+  <div class="card">
+    <div class="card-header"><h2>Token Usage by Model</h2></div>
+    <div class="card-body">
+      <div class="bar-chart" id="token-chart"></div>
+    </div>
+  </div>
+
+  <!-- ── Network I/O ── -->
+  <div class="card">
+    <div class="card-header"><h2>Network I/O</h2></div>
+    <div class="card-body" id="network-panel"></div>
+  </div>
+
+  <!-- ── SQL Query Log ── -->
+  <div class="card grid-full">
+    <div class="card-header"><h2>Recent SQL Queries</h2></div>
+    <div class="card-body query-log" id="sql-log"></div>
+  </div>
+</div>
+
+<script>
+// ───────────────────── Mock data (replace with real /api/admin/* calls) ─────
+var AGENTS = [
+  {id:'agent-01',host:'10.0.1.10:8000',status:'online',model:'gpt-4o',uptime:'3d 14h',rpm:42,tokens:284000,latency:1.2,errors:3},
+  {id:'agent-02',host:'10.0.1.11:8000',status:'online',model:'claude-sonnet-4-20250514',uptime:'3d 14h',rpm:38,tokens:196000,latency:2.1,errors:0},
+  {id:'agent-03',host:'10.0.2.20:8000',status:'online',model:'gpt-4o-mini',uptime:'1d 8h',rpm:65,tokens:520000,latency:0.8,errors:1},
+  {id:'agent-04',host:'10.0.2.21:8000',status:'degraded',model:'gpt-3.5-turbo',uptime:'12h',rpm:12,tokens:45000,latency:4.5,errors:18},
+  {id:'agent-05',host:'10.0.3.30:8000',status:'offline',model:'claude-haiku-4-5-20251015',uptime:'—',rpm:0,tokens:0,latency:0,errors:0},
+];
+
+var TOKEN_BY_MODEL = [
+  {model:'GPT-4o',tokens:284000},
+  {model:'Claude Sonnet',tokens:196000},
+  {model:'GPT-4o Mini',tokens:520000},
+  {model:'GPT-3.5',tokens:45000},
+  {model:'Claude Haiku',tokens:0},
+];
+
+var SQL_QUERIES = [
+  {sql:'SELECT * FROM conversations WHERE user_id=$1 ORDER BY updated_at DESC LIMIT 50',time_ms:2.3,rows:12,source:'agent-01'},
+  {sql:'INSERT INTO messages (conversation_id,role,content) VALUES ($1,$2,$3)',time_ms:1.1,rows:1,source:'agent-03'},
+  {sql:'SELECT * FROM usage_logs WHERE created_at > NOW() - INTERVAL \'1 hour\' ORDER BY created_at DESC',time_ms:8.7,rows:340,source:'agent-02'},
+  {sql:'UPDATE conversations SET updated_at=NOW() WHERE id=$1',time_ms:0.9,rows:1,source:'agent-01'},
+  {sql:'SELECT model, SUM(total_tokens) FROM usage_logs GROUP BY model',time_ms:15.2,rows:5,source:'agent-04'},
+  {sql:'INSERT INTO usage_logs (user_id,model,prompt_tokens,completion_tokens,total_tokens,latency_ms) VALUES ($1,$2,$3,$4,$5,$6)',time_ms:1.4,rows:1,source:'agent-03'},
+];
+
+var NETWORK = {
+  bytes_in: '24.3 MB/s',
+  bytes_out: '18.7 MB/s',
+  ws_connections: 47,
+  http_conn_pool: '38/100',
+  pg_conn_pool: '8/20',
+  kafka_lag: '12 msgs',
+};
+
+// ───────────────────── Render ─────────────────────
+
+function refreshAll() {
+  // In production: fetch('/api/admin/agents'), fetch('/api/admin/sql-log'), etc.
+  renderOverview();
+  renderAgents();
+  renderTokenChart();
+  renderNetwork();
+  renderSQLLog();
+  document.getElementById('last-refresh').textContent = new Date().toLocaleTimeString();
+}
+
+function renderOverview() {
+  var online = AGENTS.filter(function(a){return a.status==='online'}).length;
+  var total = AGENTS.length;
+  var totalTokens = AGENTS.reduce(function(s,a){return s+a.tokens},0);
+  var avgLat = AGENTS.filter(function(a){return a.latency>0});
+  avgLat = avgLat.length ? (avgLat.reduce(function(s,a){return s+a.latency},0)/avgLat.length).toFixed(1) : '—';
+  var totalConvos = 0; // would come from API
+  var totalWs = NETWORK.ws_connections;
+
+  document.getElementById('s-agents').textContent = total;
+  document.getElementById('s-online').textContent = online;
+  document.getElementById('s-online').className = 'stat-value' + (online < total ? ' warn' : '');
+  document.getElementById('s-convos').textContent = '128'; // mock
+  document.getElementById('s-ws').textContent = totalWs;
+  document.getElementById('s-tokens').textContent = formatTokens(totalTokens);
+  document.getElementById('s-token-cost').textContent = '≈ $' + (totalTokens / 1000 * 0.002).toFixed(2) + ' est.';
+  document.getElementById('s-latency').textContent = avgLat + 's';
+  document.getElementById('agent-count').textContent = total + ' agents';
+}
+
+function renderAgents() {
+  var tbody = document.getElementById('agent-tbody');
+  tbody.innerHTML = '';
+  AGENTS.forEach(function(a) {
+    var cls = a.status === 'online' ? 'online' : a.status === 'degraded' ? 'degraded' : 'offline';
+    var errCls = a.errors > 10 ? ' style="color:var(--danger)"' : '';
+    tbody.innerHTML += '<tr>'
+      + '<td><span class="status-dot ' + cls + '"></span>' + a.status + '</td>'
+      + '<td><strong>' + a.id + '</strong></td>'
+      + '<td><span class="agent-host">' + a.host + '</span></td>'
+      + '<td><span class="agent-model">' + a.model + '</span></td>'
+      + '<td>' + a.uptime + '</td>'
+      + '<td>' + a.rpm + '</td>'
+      + '<td>' + formatTokens(a.tokens) + '</td>'
+      + '<td>' + (a.latency ? a.latency + 's' : '—') + '</td>'
+      + '<td' + errCls + '>' + a.errors + '</td>'
+      + '</tr>';
+  });
+}
+
+function renderTokenChart() {
+  var container = document.getElementById('token-chart');
+  var max = Math.max.apply(null, TOKEN_BY_MODEL.map(function(m){return m.tokens})) || 1;
+  container.innerHTML = '';
+  TOKEN_BY_MODEL.forEach(function(m) {
+    var pct = Math.max(5, (m.tokens / max) * 100);
+    var bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.height = pct + '%';
+    bar.innerHTML = '<span class="bar-value">' + formatTokens(m.tokens) + '</span>'
+      + '<span class="bar-label">' + m.model + '</span>';
+    container.appendChild(bar);
+  });
+}
+
+function renderNetwork() {
+  var panel = document.getElementById('network-panel');
+  var rows = [
+    ['Bytes In', NETWORK.bytes_in],
+    ['Bytes Out', NETWORK.bytes_out],
+    ['WebSocket Connections', NETWORK.ws_connections],
+    ['HTTP Connection Pool', NETWORK.http_conn_pool],
+    ['PostgreSQL Pool', NETWORK.pg_conn_pool],
+    ['Kafka Consumer Lag', NETWORK.kafka_lag],
+  ];
+  panel.innerHTML = rows.map(function(r) {
+    return '<div class="net-row"><span class="net-label">' + r[0] + '</span><span class="net-value">' + r[1] + '</span></div>';
+  }).join('');
+}
+
+function renderSQLLog() {
+  var log = document.getElementById('sql-log');
+  log.innerHTML = '';
+  SQL_QUERIES.forEach(function(q) {
+    var slow = q.time_ms > 10 ? ' slow' : '';
+    log.innerHTML += '<div class="query-item">'
+      + '<div class="query-sql">' + esc(q.sql) + '</div>'
+      + '<div class="query-meta">'
+      + '<span class="' + slow + '">' + q.time_ms + 'ms</span>'
+      + '<span>' + q.rows + ' rows</span>'
+      + '<span>' + q.source + '</span>'
+      + '</div></div>';
+  });
+}
+
+function formatTokens(n) {
+  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n/1000).toFixed(0) + 'K';
+  return n.toString();
+}
+
+function esc(s) { var d=document.createElement('div');d.textContent=s;return d.innerHTML; }
+
+// ── Init ──
+refreshAll();
+setInterval(refreshAll, 30000); // auto-refresh every 30s
+</script>
+</body>
+</html>

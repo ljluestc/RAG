@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "chatgpt-backend"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["chatgpt-backend:8000"]
+        labels:
+          service: "chatgpt"
+
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]

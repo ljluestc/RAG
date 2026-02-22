@@ -1,0 +1,165 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Request Rate (req/s)",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "rate(http_requests_total{service=\"chatgpt\"}[1m])", "legendFormat": "{{method}} {{handler}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "title": "Latency Percentiles",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 0 },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{service=\"chatgpt\"}[5m]))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service=\"chatgpt\"}[5m]))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{service=\"chatgpt\"}[5m]))", "legendFormat": "p99" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "title": "Error Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 0 },
+      "targets": [
+        { "expr": "rate(http_requests_total{service=\"chatgpt\",status=~\"5..\"}[5m]) * 60", "legendFormat": "5xx" },
+        { "expr": "rate(http_requests_total{service=\"chatgpt\",status=~\"4..\"}[5m]) * 60", "legendFormat": "4xx" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "title": "Token Usage by Model (tokens/min)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+      "targets": [
+        { "expr": "rate(chatgpt_tokens_total{direction=\"prompt\"}[5m]) * 60", "legendFormat": "{{model}} prompt" },
+        { "expr": "rate(chatgpt_tokens_total{direction=\"completion\"}[5m]) * 60", "legendFormat": "{{model}} completion" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } } }
+    },
+    {
+      "title": "Token Cost ($/hr)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 7 },
+      "targets": [
+        { "expr": "(rate(chatgpt_tokens_total[5m]) * 3600 / 1000) * 0.002", "legendFormat": "$/hr" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "currencyUSD", "thresholds": { "steps": [{"value": 0, "color": "green"}, {"value": 5, "color": "yellow"}, {"value": 20, "color": "red"}] } } }
+    },
+    {
+      "title": "Active WebSockets",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 7 },
+      "targets": [
+        { "expr": "rag_http_requests_inprogress{handler=\"/ws/chat\"}", "legendFormat": "WS" }
+      ],
+      "fieldConfig": { "defaults": { "thresholds": { "steps": [{"value": 0, "color": "green"}, {"value": 50, "color": "yellow"}, {"value": 100, "color": "red"}] } } }
+    },
+    {
+      "title": "Tokens Today",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 11 },
+      "targets": [
+        { "expr": "increase(chatgpt_tokens_total[24h])", "legendFormat": "total" }
+      ]
+    },
+    {
+      "title": "Conversations",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 11 },
+      "targets": [
+        { "expr": "chatgpt_active_conversations", "legendFormat": "active" }
+      ]
+    },
+    {
+      "title": "PostgreSQL Query Latency (ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, rate(pg_stat_activity_query_duration_seconds_bucket[5m])) * 1000", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, rate(pg_stat_activity_query_duration_seconds_bucket[5m])) * 1000", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, rate(pg_stat_activity_query_duration_seconds_bucket[5m])) * 1000", "legendFormat": "p99" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ms" } }
+    },
+    {
+      "title": "SQL Queries/s",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 15 },
+      "targets": [
+        { "expr": "rate(pg_stat_database_xact_commit{datname=\"chatgpt\"}[5m])", "legendFormat": "commits/s" },
+        { "expr": "rate(pg_stat_database_xact_rollback{datname=\"chatgpt\"}[5m])", "legendFormat": "rollbacks/s" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" } }
+    },
+    {
+      "title": "PG Connection Pool",
+      "type": "gauge",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 15 },
+      "targets": [
+        { "expr": "pg_stat_activity_count{datname=\"chatgpt\"}", "legendFormat": "active" }
+      ],
+      "fieldConfig": { "defaults": { "min": 0, "max": 20, "thresholds": { "steps": [{"value": 0, "color": "green"}, {"value": 15, "color": "yellow"}, {"value": 19, "color": "red"}] } } }
+    },
+    {
+      "title": "Slow Queries (>100ms)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 19 },
+      "targets": [
+        { "expr": "increase(pg_slow_queries_total{datname=\"chatgpt\"}[1h])", "legendFormat": "slow" }
+      ],
+      "fieldConfig": { "defaults": { "thresholds": { "steps": [{"value": 0, "color": "green"}, {"value": 5, "color": "yellow"}, {"value": 20, "color": "red"}] } } }
+    },
+    {
+      "title": "Network I/O",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+      "targets": [
+        { "expr": "rate(container_network_receive_bytes_total{name=\"chatgpt-backend\"}[5m])", "legendFormat": "RX" },
+        { "expr": "rate(container_network_transmit_bytes_total{name=\"chatgpt-backend\"}[5m])", "legendFormat": "TX" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "fillOpacity": 15 } } }
+    },
+    {
+      "title": "Network Packets",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 23 },
+      "targets": [
+        { "expr": "rate(container_network_receive_packets_total{name=\"chatgpt-backend\"}[5m])", "legendFormat": "RX pkts/s" },
+        { "expr": "rate(container_network_transmit_packets_total{name=\"chatgpt-backend\"}[5m])", "legendFormat": "TX pkts/s" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "pps" } }
+    },
+    {
+      "title": "Kafka Consumer Lag",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 23 },
+      "targets": [
+        { "expr": "kafka_consumer_group_lag{group=\"chatgpt-workers\"}", "legendFormat": "lag" }
+      ],
+      "fieldConfig": { "defaults": { "thresholds": { "steps": [{"value": 0, "color": "green"}, {"value": 100, "color": "yellow"}, {"value": 1000, "color": "red"}] } } }
+    },
+    {
+      "title": "Redis ops/s",
+      "type": "timeseries",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 27 },
+      "targets": [
+        { "expr": "rate(redis_commands_total{instance=\"chatgpt-redis:6379\"}[5m])", "legendFormat": "ops/s" }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["chatgpt", "rag", "admin"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "ChatGPT RAG — Admin Dashboard",
+  "uid": "chatgpt-rag-admin"
+}

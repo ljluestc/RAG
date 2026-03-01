@@ -23,6 +23,7 @@ MODELS: List[ModelInfo] = [
     ModelInfo(id="gpt-3.5-turbo", provider="openai", name="GPT-3.5 Turbo", max_tokens=4096),
     ModelInfo(id="claude-sonnet-4-20250514", provider="anthropic", name="Claude Sonnet 4", max_tokens=8192),
     ModelInfo(id="claude-haiku-4-5-20251015", provider="anthropic", name="Claude Haiku 4.5", max_tokens=4096),
+    ModelInfo(id="local-debug", provider="local", name="Local Debug Model", max_tokens=4096),
 ]
 
 _MODEL_MAP: Dict[str, ModelInfo] = {m.id: m for m in MODELS}
@@ -212,6 +213,8 @@ class LLMRouter:
     ) -> Dict[str, Any]:
         """Generate with retry + fallback."""
         models_to_try = [model] + [m for m in self._fallback_chain if m != model]
+        if "local" in self._providers and "local-debug" not in models_to_try:
+            models_to_try.append("local-debug")
 
         last_error: Exception | None = None
         for mid in models_to_try:
@@ -244,4 +247,7 @@ class LLMRouter:
     @property
     def available_models(self) -> List[ModelInfo]:
         available_providers = set(self._providers.keys())
-        return [m for m in MODELS if m.provider in available_providers]
+        models = [m for m in MODELS if m.provider in available_providers]
+        if not models:
+            return [ModelInfo(id="local-debug", provider="local", name="Local Debug Model", max_tokens=4096)]
+        return models

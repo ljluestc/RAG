@@ -71,6 +71,9 @@ class Retriever:
             query, self.embedding_generator, top_k=initial_k, filter_dict=filter_dict
         )
 
+        # Hybrid retrieval hook: combine dense scores with lightweight BM25 on retrieved set.
+        results = self._apply_hybrid_scoring(query, results)
+
         # Filter by score threshold
         results = [r for r in results if r["score"] >= score_threshold]
 
@@ -96,6 +99,68 @@ class Retriever:
             results = results[:top_k]
 
         logger.info(f"Retrieved {len(results)} documents")
+        return results
+
+    @staticmethod
+    def _tokenize(text: str) -> List[str]:
+        return [t for t in "".join(ch.lower() if ch.isalnum() else " " for ch in text).split() if t]
+
+    def _bm25_scores(self, query: str, docs: List[str], k1: float = 1.5, b: float = 0.75) -> List[float]:
+        """Compute lightweight BM25 scores over candidate docs."""
+        if not docs:
+            return []
+        tokenized_docs = [self._tokenize(d) for d in docs]
+        query_terms = self._tokenize(query)
+        if not query_terms:
+            return [0.0] * len(docs)
+
+        n_docs = len(tokenized_docs)
+        avgdl = sum(len(d) for d in tokenized_docs) / max(1, n_docs)
+
+        # Document frequencies
+        df: Dict[str, int] = {}
+        for toks in tokenized_docs:
+            for t in set(toks):
+                df[t] = df.get(t, 0) + 1
+
+        scores: List[float] = []
+        for toks in tokenized_docs:
+            tf: Dict[str, int] = {}
+            for t in toks:
+                tf[t] = tf.get(t, 0) + 1
+            dl = len(toks) or 1
+            score = 0.0
+            for term in query_terms:
+                if term not in tf:
+                    continue
+                term_df = df.get(term, 0)
+                idf = np.log(1 + (n_docs - term_df + 0.5) / (term_df + 0.5))
+                freq = tf[term]
+                denom = freq + k1 * (1 - b + b * (dl / max(1.0, avgdl)))
+                score += idf * ((freq * (k1 + 1)) / max(denom, 1e-9))
+            scores.append(float(score))
+
+        return scores
+
+    def _apply_hybrid_scoring(
+        self,
+        query: str,
+        results: List[Dict[str, Any]],
+        dense_weight: float = 0.7,
+        bm25_weight: float = 0.3,
+    ) -> List[Dict[str, Any]]:
+        """Blend dense similarity with BM25 for hybrid retrieval."""
+        if not results:
+            return results
+        docs = [r.get("content", "") for r in results]
+        bm25_scores = self._bm25_scores(query, docs)
+        max_bm25 = max(bm25_scores) if bm25_scores else 0.0
+        for r, bm25 in zip(results, bm25_scores):
+            bm25_norm = (bm25 / max_bm25) if max_bm25 > 0 else 0.0
+            dense = float(r.get("score", 0.0))
+            r["dense_score"] = dense
+            r["bm25_score"] = bm25_norm
+            r["score"] = (dense_weight * dense) + (bm25_weight * bm25_norm)
         return results
 
     def _rerank(

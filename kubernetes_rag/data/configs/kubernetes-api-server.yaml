@@ -1,0 +1,40 @@
+# Kubernetes API Server Configuration Reference
+# Internal config for operator reference — do not apply directly
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kube-apiserver-config
+  namespace: kube-system
+
+---
+# Key API Server Flags (typical production)
+
+--etcd-servers=https://127.0.0.1:2379
+--etcd-cafile=/etc/kubernetes/pki/etcd/ca.crt
+--etcd-certfile=/etc/kubernetes/pki/apiserver-etcd-client.crt
+--etcd-keyfile=/etc/kubernetes/pki/apiserver-etcd-client.key
+
+# Request handling
+--max-requests-inflight=800
+--max-mutating-requests-inflight=400
+--request-timeout=60s
+
+# Admission
+--enable-admission-plugins=NodeRestriction,PodSecurityPolicy
+--disable-admission-plugins=ServiceAccount
+
+# Audit
+--audit-log-path=/var/log/kubernetes/audit.log
+--audit-log-maxage=30
+--audit-log-maxbackup=10
+--audit-log-maxsize=100
+
+# TLS
+--tls-cert-file=/etc/kubernetes/pki/apiserver.crt
+--tls-private-key-file=/etc/kubernetes/pki/apiserver.key
+--client-ca-file=/etc/kubernetes/pki/ca.crt
+
+---
+# Environment / Feature Gates (common)
+KUBE_APISERVER_ARGS="--feature-gates=CSIMigration=true,CSIMigrationAWS=true"

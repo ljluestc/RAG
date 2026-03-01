@@ -251,6 +251,10 @@ var footerStats = document.getElementById('footer-stats');
 // ───────────────────── API helpers ─────────────────────
 async function api(path, opts) {
   var res = await fetch('/api' + path, opts);
+  if (!res.ok) {
+    var err = await res.text();
+    throw new Error(err || ('HTTP ' + res.status));
+  }
   return res.json();
 }
 
@@ -322,8 +326,9 @@ function renderConvList() {
 
 async function newConversation() {
   try {
-    var data = await api('/conversations', { method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({model: state.currentModel}) });
+    var data = await api('/conversations?model=' + encodeURIComponent(state.currentModel || ''), {
+      method: 'POST'
+    });
     state.activeConvId = data.id;
     await loadConversations();
     chatContainer.innerHTML = '';
@@ -376,7 +381,7 @@ function connectWebSocket() {
     if (frame.event === 'token') {
       onStreamToken(frame.data.token, frame.data.full_text);
     } else if (frame.event === 'done') {
-      onStreamDone(frame.data.full_text, frame.conversation_id);
+      onStreamDone(frame.data, frame.conversation_id);
     } else if (frame.event === 'error') {
       onStreamError(frame.data.message);
     }
@@ -465,7 +470,8 @@ function onStreamToken(token, fullText) {
   }
 }
 
-function onStreamDone(fullText, convId) {
+function onStreamDone(doneData, convId) {
+  var fullText = (doneData && doneData.full_text) || '';
   state.streaming = false;
   sendBtn.style.display = 'flex';
   stopBtn.style.display = 'none';
@@ -473,7 +479,12 @@ function onStreamDone(fullText, convId) {
 
   if (streamingEl) {
     streamingEl.classList.remove('streaming-cursor');
-    streamingEl.innerHTML = fmtMarkdown(fullText);
+    var wsData = {
+      model: (doneData && doneData.model) || state.currentModel,
+      citations: (doneData && doneData.citations) || [],
+      latency_ms: null
+    };
+    streamingEl.innerHTML = fmtMarkdown(fullText) + buildMeta(wsData) + buildCitations(wsData.citations);
   }
   streamingEl = null;
 

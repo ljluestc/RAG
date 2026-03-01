@@ -52,6 +52,26 @@ limiter = RateLimiter(rpm=settings.rate_limit_rpm, tpm=settings.rate_limit_tpm)
 ws_manager = ConnectionManager()
 
 
+def _build_rag_context(message: str) -> tuple[str, list[dict], int]:
+    """Run grounding retrieval and return system context + citations."""
+    try:
+        rag_result = rag.query(message, top_k=5, temperature=0.2)
+        citations = rag_result.get("citations", []) or []
+        answer = rag_result.get("answer", "")
+        num_sources = rag_result.get("num_sources", 0) or len(citations)
+        if not answer:
+            return "", citations, num_sources
+        context = (
+            "\n\n[RAG grounding]\n"
+            "Use these grounded findings and preserve source citations.\n"
+            f"{answer}"
+        )
+        return context, citations, num_sources
+    except Exception as exc:
+        logger.warning(f"RAG grounding failed, continuing without it: {exc}")
+        return "", [], 0
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("ChatGPT backend starting up")
@@ -103,7 +123,8 @@ async def list_conversations():
 
 
 @app.post("/api/conversations")
-async def create_conversation(model: str = "gpt-4o-mini"):
+async def create_conversation(model: str | None = Query(default=None)):
+    model = model or settings.default_model
     conv = conversations.create(model=model)
     return {"id": conv.id, "title": conv.title}
 
@@ -154,13 +175,20 @@ async def chat(req: ChatRequest):
     user_msg = Message(role=Role.user, content=req.message)
     conversations.add_message(conv.id, user_msg)
 
-    # Run plugins if enabled
-    plugin_context = ""
+    # RAG grounding is enabled by default for operator trust/auditability.
+    rag_context, citations, num_sources = _build_rag_context(req.message)
+
+    # Run optional plugins
+    plugin_context = rag_context
     if req.plugins:
         results = await plugins.run_many(req.plugins, req.message)
         plugin_texts = [r.get("result_text", "") for r in results if r.get("result_text")]
         if plugin_texts:
-            plugin_context = "\n\n[Plugin results]\n" + "\n---\n".join(plugin_texts)
+            plugin_context = (
+                plugin_context
+                + "\n\n[Plugin results]\n"
+                + "\n---\n".join(plugin_texts)
+            )
 
     # Build LLM messages
     llm_messages = conversations.get_context_messages(conv.id)
@@ -189,6 +217,7 @@ async def chat(req: ChatRequest):
         usage=usage,
         model=result.get("model", model),
         latency_ms=latency,
+        citations=citations[:max(1, min(12, num_sources or len(citations)))],
     )
 
 
@@ -250,7 +279,12 @@ async def websocket_chat(ws: WebSocket):
             model = data.get("model", settings.default_model)
             temperature = data.get("temperature", 0.7)
             max_tokens = data.get("max_tokens", 2048)
-            plugin_ids = [PluginID(p) for p in data.get("plugins", []) if p in PluginID.__members__]
+            plugin_ids: list[PluginID] = []
+            for p in data.get("plugins", []):
+                try:
+                    plugin_ids.append(PluginID(p))
+                except ValueError:
+                    continue
 
             # Rate limit
             if not limiter.consume("default"):
@@ -265,13 +299,20 @@ async def websocket_chat(ws: WebSocket):
             user_msg = Message(role=Role.user, content=message_text)
             conversations.add_message(conv.id, user_msg)
 
-            # Plugins
-            plugin_context = ""
+            # Grounding context by default
+            rag_context, citations, num_sources = _build_rag_context(message_text)
+
+            # Optional plugins
+            plugin_context = rag_context
             if plugin_ids:
                 results = await plugins.run_many(plugin_ids, message_text)
                 plugin_texts = [r.get("result_text", "") for r in results if r.get("result_text")]
                 if plugin_texts:
-                    plugin_context = "\n\n[Plugin results]\n" + "\n---\n".join(plugin_texts)
+                    plugin_context = (
+                        plugin_context
+                        + "\n\n[Plugin results]\n"
+                        + "\n---\n".join(plugin_texts)
+                    )
 
             # Build context
             llm_messages = conversations.get_context_messages(conv.id)
@@ -285,7 +326,15 @@ async def websocket_chat(ws: WebSocket):
                 temperature=temperature,
                 max_tokens=max_tokens,
             )
-            full_text = await ws_manager.stream_tokens(ws, token_iter, conv.id)
+            full_text = await ws_manager.stream_tokens(
+                ws,
+                token_iter,
+                conv.id,
+                done_payload={
+                    "model": model,
+                    "citations": citations[:max(1, min(12, num_sources or len(citations)))],
+                },
+            )
 
             # Save assistant message
             assistant_msg = Message(role=Role.assistant, content=full_text)

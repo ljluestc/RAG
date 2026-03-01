@@ -361,7 +361,18 @@ async def ingest_endpoint(request: IngestRequest):
                 raise HTTPException(status_code=404, detail="File not found")
 
             # Validate file format
-            supported_formats = {".md", ".txt", ".pdf", ".html"}
+            supported_formats = {
+                ".md",
+                ".markdown",
+                ".txt",
+                ".pdf",
+                ".html",
+                ".yaml",
+                ".yml",
+                ".json",
+                ".ini",
+                ".conf",
+            }
             if file_path.suffix.lower() not in supported_formats:
                 raise HTTPException(
                     status_code=400,

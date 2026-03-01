@@ -144,7 +144,11 @@ class DocumentChunker:
 
     def _split_text(self, text: str) -> List[str]:
         """Split text using the defined separators."""
+        if not text:
+            return []
         for separator in self.separators:
+            if separator == "":
+                continue
             if separator in text:
                 parts = text.split(separator)
                 return [p + separator for p in parts if p]
@@ -159,6 +163,8 @@ class DocumentChunker:
         # Try to find a good breaking point
         overlap = text[-self.chunk_overlap :]
         for separator in self.separators:
+            if separator == "":
+                continue
             if separator in overlap:
                 parts = overlap.split(separator)
                 return separator.join(parts[1:])

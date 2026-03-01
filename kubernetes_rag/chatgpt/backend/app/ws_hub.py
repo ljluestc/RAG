@@ -57,6 +57,7 @@ class ConnectionManager:
         ws: WebSocket,
         token_iterator,
         conversation_id: str,
+        done_payload: Dict[str, Any] | None = None,
     ) -> str:
         """Stream tokens from an async iterator to a WebSocket.
 
@@ -78,7 +79,7 @@ class ConnectionManager:
             # Done frame
             done_frame = WSFrame(
                 event="done",
-                data={"full_text": full_text},
+                data={"full_text": full_text, **(done_payload or {})},
                 conversation_id=conversation_id,
             )
             await ws.send_text(done_frame.model_dump_json())

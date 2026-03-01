@@ -41,7 +41,11 @@ class RAGService:
 
             config = load_config(self._config_path)
             self._retriever = create_retriever(config)
-            self._generator = create_rag_generator(config)
+            try:
+                self._generator = create_rag_generator(config)
+            except Exception as exc:
+                logger.warning(f"RAG generator unavailable, using extractive fallback: {exc}")
+                self._generator = None
             self._ready = True
             logger.info("RAG service initialized successfully")
         except Exception as exc:
@@ -64,9 +68,40 @@ class RAGService:
         if not results:
             return {"answer": "No relevant documents found.", "citations": []}
 
-        answer_data = self._generator.generate_answer(
-            question, results, temperature=temperature
-        )
+        if self._generator is None:
+            # Extractive fallback keeps system grounded even without LLM API keys.
+            citations = []
+            for idx, doc in enumerate(results, 1):
+                meta = doc.get("metadata", {})
+                citations.append({
+                    "citation_id": idx,
+                    "source": meta.get("source", "unknown"),
+                    "filename": meta.get("filename", "unknown"),
+                    "doc_type": meta.get("type", "unknown"),
+                    "chunk_index": meta.get("chunk_index", 0),
+                    "section_title": meta.get("section_title"),
+                    "page_number": meta.get("page_number"),
+                    "relevance_score": float(doc.get("score", 0.0)),
+                    "passage": (doc.get("content", "")[:300] or ""),
+                    "url": None,
+                })
+            bullets = []
+            for i, c in enumerate(citations[:4], 1):
+                snippet = c["passage"].strip().replace("\n", " ")
+                bullets.append(f"- [Source {i}] {snippet}")
+            fallback_answer = (
+                "Grounded retrieval results (LLM unavailable; extractive mode):\n\n"
+                + "\n".join(bullets)
+            )
+            return {
+                "answer": fallback_answer,
+                "citations": citations,
+                "model_used": "extractive-fallback",
+                "tokens_used": {"prompt": 0, "completion": 0, "total": 0},
+                "num_sources": len(results),
+            }
+
+        answer_data = self._generator.generate_answer(question, results, temperature=temperature)
         return {
             "answer": answer_data.get("answer", ""),
             "citations": answer_data.get("citations", []),

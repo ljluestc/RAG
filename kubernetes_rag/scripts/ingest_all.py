@@ -35,6 +35,9 @@ def ingest_local(pipeline, data_dir: Path) -> dict:
         "arxiv_papers": {"files": 0, "chunks": 0},
         "devops_exercises": {"files": 0, "chunks": 0},
         "sample_docs": {"files": 0, "chunks": 0},
+        "runbooks": {"files": 0, "chunks": 0},
+        "incidents": {"files": 0, "chunks": 0},
+        "configs": {"files": 0, "chunks": 0},
         "github_pdfs_local": {"files": 0, "chunks": 0},
     }
 
@@ -98,6 +101,57 @@ def ingest_local(pipeline, data_dir: Path) -> dict:
                 logger.info(f"  {pdf.name}: {n} chunks")
             except Exception as e:
                 logger.error(f"  FAILED {pdf.name}: {e}")
+
+    # 5. Internal runbooks
+    runbooks_dir = data_dir / "runbooks"
+    if runbooks_dir.exists():
+        logger.info("=== Ingesting runbooks ===")
+        files = sorted(
+            f for f in runbooks_dir.rglob("*")
+            if f.suffix.lower() in {".md", ".markdown", ".txt", ".pdf"}
+        )
+        logger.info(f"Found {len(files)} runbook files")
+        for f in files:
+            try:
+                n = pipeline.ingest_file(f, source_type="runbook")
+                stats["runbooks"]["files"] += 1
+                stats["runbooks"]["chunks"] += n
+            except Exception as e:
+                logger.error(f"  FAILED {f.name}: {e}")
+
+    # 6. Incident timelines
+    incidents_dir = data_dir / "incidents"
+    if incidents_dir.exists():
+        logger.info("=== Ingesting incidents ===")
+        files = sorted(
+            f for f in incidents_dir.rglob("*")
+            if f.suffix.lower() in {".md", ".markdown", ".txt", ".pdf"}
+        )
+        logger.info(f"Found {len(files)} incident files")
+        for f in files:
+            try:
+                n = pipeline.ingest_file(f, source_type="incident")
+                stats["incidents"]["files"] += 1
+                stats["incidents"]["chunks"] += n
+            except Exception as e:
+                logger.error(f"  FAILED {f.name}: {e}")
+
+    # 7. Config references
+    configs_dir = data_dir / "configs"
+    if configs_dir.exists():
+        logger.info("=== Ingesting configs ===")
+        files = sorted(
+            f for f in configs_dir.rglob("*")
+            if f.suffix.lower() in {".yaml", ".yml", ".json", ".conf", ".ini", ".txt", ".md"}
+        )
+        logger.info(f"Found {len(files)} config files")
+        for f in files:
+            try:
+                n = pipeline.ingest_file(f, source_type="config")
+                stats["configs"]["files"] += 1
+                stats["configs"]["chunks"] += n
+            except Exception as e:
+                logger.error(f"  FAILED {f.name}: {e}")
 
     return stats
 

@@ -9,15 +9,22 @@ import pytest
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-# Import test configuration
-from test_config_comprehensive import (
-    create_mock_config,
-    create_mock_settings,
-    create_mock_llm,
-    create_mock_retriever,
-    create_mock_rag_generator,
-    TEST_CONFIG_DATA
-)
+# Local lightweight helpers (the old external test config module was removed).
+def create_mock_llm():
+    llm = Mock()
+    llm.generate.return_value = "Mock grounded answer [Source 1]"
+    llm.get_model_name.return_value = "mock-model"
+    llm.last_usage = {"input_tokens": 10, "output_tokens": 5}
+    return llm
+
+
+def create_mock_config():
+    llm_cfg = Mock()
+    llm_cfg.provider = "openai"
+    llm_cfg.model_name = "gpt-3.5-turbo"
+    cfg = Mock()
+    cfg.llm = llm_cfg
+    return cfg
 
 from src.generation.llm import (
     LLMBase,

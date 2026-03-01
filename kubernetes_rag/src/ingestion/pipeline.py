@@ -35,12 +35,24 @@ class IngestionPipeline:
         self.embedding_generator = embedding_generator
         self.doc_processor = doc_processor
 
-    def ingest_file(self, file_path: Path) -> int:
+    def _get_source_type(self, file_path: Path) -> str:
+        """Infer doc_type from path for runbooks, incidents, configs."""
+        path_str = str(file_path).lower()
+        if "runbook" in path_str:
+            return "runbook"
+        if "incident" in path_str:
+            return "incident"
+        if "config" in path_str:
+            return "config"
+        return "kubernetes_doc"
+
+    def ingest_file(self, file_path: Path, source_type: Optional[str] = None) -> int:
         """
         Ingest a single file (markdown or PDF).
 
         Args:
             file_path: Path to the file
+            source_type: Optional override for doc type (runbook, incident, config)
 
         Returns:
             Number of documents ingested
@@ -62,6 +74,12 @@ class IngestionPipeline:
         if not documents:
             logger.warning(f"No documents extracted from {file_path}")
             return 0
+
+        # Override metadata type for runbooks, incidents, configs
+        doc_type = source_type or self._get_source_type(file_path)
+        if doc_type != "kubernetes_doc":
+            for doc in documents:
+                doc.metadata["type"] = doc_type
 
         # Generate embeddings
         logger.info(f"Generating embeddings for {len(documents)} chunks")
@@ -93,8 +111,18 @@ class IngestionPipeline:
         if not directory.exists():
             raise ValueError(f"Directory not found: {directory}")
 
-        # Find all matching files (support both MD and PDF)
-        supported_extensions = {".md", ".markdown", ".txt", ".pdf"}
+        # Find all matching files including config formats
+        supported_extensions = {
+            ".md",
+            ".markdown",
+            ".txt",
+            ".pdf",
+            ".yaml",
+            ".yml",
+            ".json",
+            ".ini",
+            ".conf",
+        }
         if file_pattern == "*":
             files = [f for f in directory.rglob("*") if f.suffix.lower() in supported_extensions]
         else:

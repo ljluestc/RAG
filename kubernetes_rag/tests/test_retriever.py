@@ -46,7 +46,9 @@ class TestRetriever:
         results = retriever.retrieve("test query", top_k=2)
 
         assert len(results) == 2
-        assert results[0]["score"] == 0.9
+        # Hybrid scoring blends dense + BM25; verify ordering and dense preservation.
+        assert results[0]["score"] > results[1]["score"]
+        assert results[0]["dense_score"] == 0.9
 
     def test_score_threshold(self, mock_components):
         """Test score threshold filtering."""

@@ -7,8 +7,12 @@ A comprehensive Retrieval-Augmented Generation (RAG) system for Kubernetes learn
 - **Intelligent Document Processing**: Processes markdown documentation with smart chunking
 - **Q&A Extraction**: Automatically extracts question-answer pairs from documentation
 - **Semantic Search**: Uses sentence transformers for semantic similarity search
+- **Hybrid Retrieval**: Dense embedding retrieval + lightweight BM25 score blending
 - **Re-ranking**: Cross-encoder re-ranking for improved retrieval accuracy
 - **LLM Integration**: Supports OpenAI, Anthropic, and local models
+- **Citation Grounding**: Source-linked citations in every generated response
+- **Security Guardrails**: Prompt-injection and secret-exfiltration safeguards
+- **Answer Quality Metrics**: Groundedness and citation coverage surfaced per response
 - **Dual Interface**: Both CLI and REST API available
 - **Flexible Configuration**: Easy-to-customize YAML configuration
 - **Vector Storage**: ChromaDB for efficient embedding storage and retrieval
@@ -103,6 +107,13 @@ python -m src.cli ingest path/to/kubernetes_doc.md
 
 # Ingest a directory
 python -m src.cli ingest path/to/docs/ --file-pattern "*.md"
+
+# Ingest all technical corpora:
+# - local runbooks/incidents/configs/sample docs
+# - DevOps Exercises (all topics)
+# - system-design repository
+# - curated GitHub PDF collections
+python -m scripts.ingest_all --max-per-repo 10
 ```
 
 ### 2. Query the System
@@ -228,6 +239,11 @@ Content-Type: application/json
   "temperature": 0.3
 }
 ```
+
+Response includes:
+- `tokens_used`: prompt/completion/total token usage per interaction
+- `quality`: `groundedness_score` + citation coverage metrics
+- `citations`: source metadata for auditability
 
 ### Search Endpoint
 
@@ -381,6 +397,24 @@ pytest --cov=src tests/
 # Run specific test file
 pytest tests/test_document_processor.py -v
 ```
+
+Current CI also runs:
+- unit/integration test suite with coverage on PRs
+- static security scan (`bandit`) for changed code paths
+
+## Public Frontend Deployment
+
+### Option A: Vercel
+- Frontend path: `kubernetes_rag/chatgpt/frontend`
+- Configure rewrite targets in `vercel.json` to your backend API/WS URLs
+- Deploy as a static project (no build step required)
+
+### Option B: GitHub Pages
+- Workflow: `.github/workflows/frontend-pages.yml`
+- Set repo variables:
+  - `PUBLIC_BACKEND_URL` (e.g. `https://api.example.com`)
+  - `PUBLIC_BACKEND_WS_URL` (e.g. `wss://api.example.com`)
+- Trigger workflow to publish frontend publicly.
 
 ## Project Structure
 

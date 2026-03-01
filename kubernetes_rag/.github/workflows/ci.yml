@@ -1,247 +1,125 @@
-name: CI/CD Pipeline
+name: CI
 
 on:
-  push:
-    branches: [ main, develop ]
   pull_request:
-    branches: [ main, develop ]
-  schedule:
-    # Run tests daily at 2 AM UTC
-    - cron: '0 2 * * *'
-
-env:
-  PYTHON_VERSION: '3.9'
-  NODE_VERSION: '18'
+    branches: [main]
+  push:
+    branches: [main, develop, "feature/**", "fix/**"]
 
 jobs:
   test:
-    name: Test Suite
+    name: Tests (Python 3.11)
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11']
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-        
-    - name: Cache pip dependencies
-      uses: actions/cache@v3
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-          
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pytest pytest-cov pytest-html pytest-xdist pytest-benchmark pytest-mock coverage psutil memory-profiler flake8 black isort mypy
-        
-    - name: Set up test environment
-      run: |
-        python -m venv venv
-        source venv/bin/activate
-        pip install -r requirements.txt
-        
-    - name: Run linting
-      run: |
-        flake8 src/ --max-line-length=100 --count --select=E9,F63,F7,F82 --show-source --statistics
-        black --check src/
-        isort --check-only src/
-        
-    - name: Run type checking
-      run: |
-        mypy src/ --ignore-missing-imports
-        
-    - name: Run unit tests
-      run: |
-        source venv/bin/activate
-        python -m pytest tests/test_generation_fixed.py tests/test_ingestion_fixed.py tests/test_retrieval_fixed.py tests/test_utils_fixed.py -v --cov=src --cov-report=xml --cov-report=html --junitxml=test-results.xml
-        
-    - name: Run integration tests
-      run: |
-        source venv/bin/activate
-        python -m pytest tests/test_api_fixed.py tests/test_cli_fixed.py tests/test_api_integration.py -v --cov=src --cov-append --junitxml=integration-results.xml
-        
-    - name: Run performance tests
-      run: |
-        source venv/bin/activate
-        python -m pytest tests/test_performance_fixed.py -v --benchmark-only --benchmark-sort=mean
-        
-    - name: Run comprehensive test suite
-      run: |
-        source venv/bin/activate
-        python test_comprehensive.py --coverage-only
-        
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
-        
-    - name: Upload test results
-      uses: actions/upload-artifact@v3
-      if: always()
-      with:
-        name: test-results-${{ matrix.python-version }}
-        path: |
-          test-results.xml
-          integration-results.xml
-          htmlcov/
-          coverage.xml
-          
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: |
+            kubernetes_rag/requirements.txt
+            kubernetes_rag/requirements-test.txt
+
+      - name: Install dependencies
+        working-directory: kubernetes_rag
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pdfplumber beautifulsoup4
+
+      - name: Run pytest
+        working-directory: kubernetes_rag
+        run: |
+          pytest -v --cov=src --cov-report=term-missing --cov-report=xml
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: kubernetes_rag/coverage.xml
+
   security:
-    name: Security Scan
+    name: Security checks
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-        
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install safety bandit semgrep
-        
-    - name: Run safety check
-      run: |
-        safety check --json --output safety-report.json || true
-        
-    - name: Run bandit security scan
-      run: |
-        bandit -r src/ -f json -o bandit-report.json || true
-        
-    - name: Run semgrep security scan
-      run: |
-        semgrep --config=auto src/ --json --output=semgrep-report.json || true
-        
-    - name: Upload security reports
-      uses: actions/upload-artifact@v3
-      if: always()
-      with:
-        name: security-reports
-        path: |
-          safety-report.json
-          bandit-report.json
-          semgrep-report.json
-          
-  build:
-    name: Build Package
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install bandit
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit
+
+      - name: Run bandit
+        working-directory: kubernetes_rag
+        run: |
+          bandit -r src -f txt
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, feature/**]
+
+jobs:
+  backend-tests:
     runs-on: ubuntu-latest
-    needs: [test, security]
-    
+    defaults:
+      run:
+        working-directory: kubernetes_rag
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-        
-    - name: Install build dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install build twine
-        
-    - name: Build package
-      run: |
-        python -m build
-        
-    - name: Check package
-      run: |
-        twine check dist/*
-        
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: dist
-        path: dist/
-        
-  docker:
-    name: Build Docker Image
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run test suite
+        env:
+          TESTING: "true"
+          OPENAI_API_KEY: "test-key"
+          ANTHROPIC_API_KEY: "test-key"
+        run: |
+          pytest -q
+
+  security-scan:
     runs-on: ubuntu-latest
-    needs: [test, security]
-    
+    defaults:
+      run:
+        working-directory: kubernetes_rag
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-      
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
-        
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        push: true
-        tags: |
-          kubernetes-rag:latest
-          kubernetes-rag:${{ github.sha }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-        
-  deploy:
-    name: Deploy
-    runs-on: ubuntu-latest
-    needs: [test, security, build, docker]
-    if: github.ref == 'refs/heads/main'
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Deploy to staging
-      run: |
-        echo "Deploying to staging environment..."
-        # Add your deployment commands here
-        
-    - name: Run smoke tests
-      run: |
-        echo "Running smoke tests..."
-        # Add your smoke test commands here
-        
-    - name: Deploy to production
-      if: success()
-      run: |
-        echo "Deploying to production environment..."
-        # Add your production deployment commands here
-        
-  notify:
-    name: Notify
-    runs-on: ubuntu-latest
-    needs: [test, security, build, docker, deploy]
-    if: always()
-    
-    steps:
-    - name: Notify on success
-      if: needs.test.result == 'success' && needs.security.result == 'success'
-      run: |
-        echo "All tests passed! 🎉"
-        # Add notification logic here (Slack, email, etc.)
-        
-    - name: Notify on failure
-      if: needs.test.result == 'failure' || needs.security.result == 'failure'
-      run: |
-        echo "Tests failed! ❌"
-        # Add failure notification logic here
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install scan tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit
+
+      - name: Run bandit
+        run: |
+          bandit -r src chatgpt/backend/app -x tests

@@ -162,6 +162,18 @@ class TokenUsage(BaseModel):
     total: int = 0
 
 
+class QualityMetrics(BaseModel):
+    citation_refs: int = 0
+    expected_citations: int = 0
+    citation_coverage_score: float = 0.0
+    groundedness_score: float = 0.0
+
+
+class SecurityMetrics(BaseModel):
+    query_flagged_for_injection: bool = False
+    guardrails_enabled: bool = True
+
+
 class QueryResponse(BaseModel):
     query: str
     answer: Optional[str] = None
@@ -170,6 +182,8 @@ class QueryResponse(BaseModel):
     num_sources: int
     model_used: Optional[str] = None
     tokens_used: Optional[TokenUsage] = None
+    quality: Optional[QualityMetrics] = None
+    security: Optional[SecurityMetrics] = None
     latency_ms: Optional[float] = None
     retrieval_ms: Optional[float] = None
     generation_ms: Optional[float] = None
@@ -226,6 +240,20 @@ async def query_endpoint(request: QueryRequest):
         t0 = time.perf_counter()
         logger.info(f"Received query: {request.query}")
 
+        # Basic prompt-injection safeguard at API boundary.
+        query_lower = request.query.lower()
+        suspect_patterns = [
+            "ignore previous instructions",
+            "reveal system prompt",
+            "show developer message",
+            "jailbreak",
+        ]
+        if any(pat in query_lower for pat in suspect_patterns):
+            raise HTTPException(
+                status_code=400,
+                detail="Query rejected by prompt-injection guardrail. Rephrase as a direct technical question.",
+            )
+
         # Retrieve documents
         t_ret = time.perf_counter()
         results = retriever.retrieve(request.query, top_k=request.top_k)
@@ -274,6 +302,8 @@ async def query_endpoint(request: QueryRequest):
             ]
             response["model_used"] = answer_data.get("model_used", "")
             response["tokens_used"] = answer_data.get("tokens_used", {})
+            response["quality"] = answer_data.get("quality", {})
+            response["security"] = answer_data.get("security", {})
 
         total_ms = round((time.perf_counter() - t0) * 1000, 1)
         response["latency_ms"] = total_ms
@@ -515,6 +545,7 @@ async def benchmark_endpoint(request: BenchmarkRequest):
                 "latency_ms": latency,
                 "tokens_used": tokens,
                 "citations": answer_data.get("citations", []),
+                "quality": answer_data.get("quality", {}),
             })
 
         # Build summary

@@ -214,6 +214,12 @@ function fmtMeta(data){
     p.push('<span class="meta-item"><span class="meta-label">Latency:</span> <span class="meta-value" style="'+lcls+'">'+parts+'</span></span>');}
   if(data.tokens_used){var t=data.tokens_used;var total=t.total||((t.prompt||0)+(t.completion||0));
     p.push('<span class="meta-item"><span class="meta-label">Tokens:</span> <span class="meta-value">'+total+' <span style="color:#666">('+( t.prompt||0)+' in / '+(t.completion||0)+' out)</span></span></span>');}
+  var grounded=null;
+  if(data.correctness_score!=null)grounded=Number(data.correctness_score);
+  else if(data.quality&&data.quality.groundedness_score!=null)grounded=Number(data.quality.groundedness_score);
+  if(grounded!=null){
+    p.push('<span class="meta-item"><span class="meta-label">Grounding:</span> <span class="meta-value">'+(grounded*100).toFixed(0)+'%</span></span>');
+  }
   if(data.num_sources)p.push('<span class="meta-item"><span class="meta-label">Sources:</span> <span class="meta-value">'+data.num_sources+' chunks</span></span>');
   return p.length?'<div class="response-meta">'+p.join('')+'</div>':'';
 }

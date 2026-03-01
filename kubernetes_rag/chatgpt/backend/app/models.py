@@ -88,6 +88,7 @@ class ChatResponse(BaseModel):
     model: str
     latency_ms: float
     citations: List[Dict[str, Any]] = Field(default_factory=list)
+    correctness_score: Optional[float] = None
 
 
 class ConversationSummary(BaseModel):
@@ -152,6 +153,6 @@ class BenchmarkResponse(BaseModel):
 
 class WSFrame(BaseModel):
     """JSON frame sent over WebSocket."""
-    event: str  # token | done | error | ping | pong
+    event: str  # token | done | meta | error | ping | pong
     data: Any = None
     conversation_id: Optional[str] = None

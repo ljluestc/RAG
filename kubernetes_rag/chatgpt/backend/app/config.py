@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     # --- Rate limiting ---
     rate_limit_rpm: int = 60  # requests per minute per user
     rate_limit_tpm: int = 100_000  # tokens per minute per user
+    max_user_message_chars: int = 8000
+    block_prompt_injection: bool = True
 
     # --- PostgreSQL (Phase 2) ---
     database_url: str = "postgresql+asyncpg://chatgpt:chatgpt@localhost:5432/chatgpt"

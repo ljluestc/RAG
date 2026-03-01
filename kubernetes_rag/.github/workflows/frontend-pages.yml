@@ -1,0 +1,84 @@
+name: Frontend Pages Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "kubernetes_rag/chatgpt/frontend/**"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: kubernetes_rag/chatgpt/frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Inject backend URL into static frontend
+        run: |
+          cp index.html index.deployed.html
+          sed -i "s|/api|${{ vars.PUBLIC_BACKEND_URL }}/api|g" index.deployed.html
+          sed -i "s|/ws/chat|${{ vars.PUBLIC_BACKEND_WS_URL }}/ws/chat|g" index.deployed.html
+          mv index.deployed.html index.html
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: kubernetes_rag/chatgpt/frontend
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
+name: Frontend Pages Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "kubernetes_rag/chatgpt/frontend/**"
+      - ".github/workflows/frontend-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Upload static frontend artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: kubernetes_rag/chatgpt/frontend
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+

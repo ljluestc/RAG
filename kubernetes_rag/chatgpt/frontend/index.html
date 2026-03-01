@@ -200,7 +200,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
         <button onclick="askExample(this)">What is a Kubernetes Pod?</button>
         <button onclick="askExample(this)">Explain Docker networking</button>
         <button onclick="askExample(this)">How does etcd work?</button>
-        <button onclick="askExample(this)">What is a Service Mesh?</button>
+        <button onclick="askExample(this)">Design URL shortener architecture</button>
       </div>
     </div>
   </div>
@@ -227,7 +227,10 @@ var state = {
   ws: null,
   streaming: false,
   streamAbort: false,
-  currentModel: ''
+  currentModel: '',
+  latestStreamMeta: null,
+  apiBase: '',
+  wsBase: ''
 };
 
 var chatContainer = document.getElementById('chat-container');
@@ -242,6 +245,14 @@ var footerStats = document.getElementById('footer-stats');
 
 // ───────────────────── Init ─────────────────────
 (async function init() {
+  var params = new URLSearchParams(location.search);
+  var backend = params.get('backend') || localStorage.getItem('rag_backend') || '';
+  if (backend) {
+    backend = backend.replace(/\/$/, '');
+    state.apiBase = backend;
+    state.wsBase = backend;
+    localStorage.setItem('rag_backend', backend);
+  }
   await loadModels();
   await loadPlugins();
   await loadConversations();
@@ -250,7 +261,8 @@ var footerStats = document.getElementById('footer-stats');
 
 // ───────────────────── API helpers ─────────────────────
 async function api(path, opts) {
-  var res = await fetch('/api' + path, opts);
+  var prefix = state.apiBase ? (state.apiBase + '/api') : '/api';
+  var res = await fetch(prefix + path, opts);
   if (!res.ok) {
     var err = await res.text();
     throw new Error(err || ('HTTP ' + res.status));
@@ -367,8 +379,14 @@ async function deleteConv(id) {
 
 // ───────────────────── WebSocket ─────────────────────
 function connectWebSocket() {
-  var protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  state.ws = new WebSocket(protocol + '//' + location.host + '/ws/chat');
+  var wsUrl;
+  if (state.wsBase) {
+    wsUrl = state.wsBase.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:') + '/ws/chat';
+  } else {
+    var protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    wsUrl = protocol + '//' + location.host + '/ws/chat';
+  }
+  state.ws = new WebSocket(wsUrl);
 
   state.ws.onopen = function() { footerStats.textContent = 'Connected'; };
   state.ws.onclose = function() {
@@ -382,6 +400,9 @@ function connectWebSocket() {
       onStreamToken(frame.data.token, frame.data.full_text);
     } else if (frame.event === 'done') {
       onStreamDone(frame.data, frame.conversation_id);
+    } else if (frame.event === 'meta') {
+      state.latestStreamMeta = frame.data || null;
+      applyStreamMeta();
     } else if (frame.event === 'error') {
       onStreamError(frame.data.message);
     }
@@ -407,6 +428,7 @@ async function sendMessage() {
   if (state.ws && state.ws.readyState === WebSocket.OPEN) {
     state.streaming = true;
     state.streamAbort = false;
+    state.latestStreamMeta = null;
     sendBtn.style.display = 'none';
     stopBtn.style.display = 'flex';
     compareBtn.disabled = true;
@@ -482,7 +504,9 @@ function onStreamDone(doneData, convId) {
     var wsData = {
       model: (doneData && doneData.model) || state.currentModel,
       citations: (doneData && doneData.citations) || [],
-      latency_ms: null
+      latency_ms: (doneData && doneData.latency_ms) || null,
+      usage: (doneData && doneData.usage) || null,
+      correctness_score: (doneData && doneData.correctness_score)
     };
     streamingEl.innerHTML = fmtMarkdown(fullText) + buildMeta(wsData) + buildCitations(wsData.citations);
   }
@@ -495,6 +519,17 @@ function onStreamDone(doneData, convId) {
     loadConversations();
   }
   chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+function applyStreamMeta() {
+  if (!state.latestStreamMeta) return;
+  var items = document.querySelectorAll('.message.assistant .msg-content');
+  if (!items.length) return;
+  var last = items[items.length - 1];
+  var meta = state.latestStreamMeta;
+  var existing = last.querySelector('.response-meta');
+  if (existing) existing.remove();
+  last.innerHTML = last.innerHTML + buildMeta(meta);
 }
 
 function onStreamError(msg) {
@@ -593,6 +628,9 @@ function buildMeta(data) {
   if (data.usage) {
     var u = data.usage;
     p.push('Tokens: <span class="meta-val">' + (u.total || 0) + '</span> (' + (u.prompt||0) + ' in / ' + (u.completion||0) + ' out)');
+  }
+  if (data.correctness_score != null) {
+    p.push('Grounding: <span class="meta-val">' + (Number(data.correctness_score) * 100).toFixed(0) + '%</span>');
   }
   return p.length ? '<div class="response-meta">' + p.join(' · ') + '</div>' : '';
 }

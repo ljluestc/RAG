@@ -44,6 +44,8 @@ class IngestionPipeline:
             return "incident"
         if "config" in path_str:
             return "config"
+        if "system_design" in path_str or "system-design" in path_str:
+            return "system_design"
         return "kubernetes_doc"
 
     def ingest_file(self, file_path: Path, source_type: Optional[str] = None) -> int:

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Comprehensive ingestion script: local files + manjunath5496 GitHub PDFs.
+"""Comprehensive ingestion script for local and remote technical corpora.
 
 Usage:
-    # Ingest everything (local + fetch from GitHub)
+    # Ingest everything (local + remote sources)
     python -m scripts.ingest_all
 
     # Local files only (skip GitHub fetch)
     python -m scripts.ingest_all --local-only
 
-    # GitHub fetch only (skip local)
+    # Remote fetch only (skip local)
     python -m scripts.ingest_all --github-only
 
     # Increase max PDFs per repo
@@ -156,7 +156,7 @@ def ingest_local(pipeline, data_dir: Path) -> dict:
     return stats
 
 
-def fetch_and_ingest_github(pipeline, data_dir: Path, max_per_repo: int = 5) -> dict:
+def fetch_and_ingest_github_pdfs(pipeline, data_dir: Path, max_per_repo: int = 5) -> dict:
     """Fetch PDFs from manjunath5496 GitHub repos and ingest them."""
     from src.connectors.github_pdf_connector import GitHubPDFConnector
 
@@ -181,11 +181,41 @@ def fetch_and_ingest_github(pipeline, data_dir: Path, max_per_repo: int = 5) -> 
     return stats
 
 
+def fetch_and_ingest_devops_exercises(pipeline, data_dir: Path) -> dict:
+    """Clone/pull devops-exercises and ingest all available topics."""
+    from src.connectors.devops_exercises_connector import DevOpsExercisesConnector
+
+    connector = DevOpsExercisesConnector(clone_dir=str(data_dir / "devops_exercises"))
+    connector.clone_or_pull()
+    topics = connector.list_available_topics()
+    stats = connector.fetch_and_ingest(topics=topics, pipeline=pipeline)
+    stats["topics"] = topics
+    return stats
+
+
+def fetch_and_ingest_system_design(pipeline, data_dir: Path) -> dict:
+    """Clone/pull system-design repository and ingest all supported files."""
+    from src.connectors.system_design_connector import SystemDesignConnector
+
+    connector = SystemDesignConnector(clone_dir=str(data_dir / "system_design"))
+    return connector.fetch_and_ingest(pipeline=pipeline)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Ingest all data into RAG vector DB")
     parser.add_argument("--local-only", action="store_true", help="Only ingest local files")
     parser.add_argument("--github-only", action="store_true", help="Only fetch+ingest from GitHub")
     parser.add_argument("--max-per-repo", type=int, default=5, help="Max PDFs per GitHub repo")
+    parser.add_argument(
+        "--skip-system-design",
+        action="store_true",
+        help="Skip ingesting the system-design repository",
+    )
+    parser.add_argument(
+        "--skip-devops-refresh",
+        action="store_true",
+        help="Skip refreshing and ingesting all DevOps-Exercises topics",
+    )
     args = parser.parse_args()
 
     setup_logger()
@@ -207,10 +237,29 @@ def main():
             total_chunks += s["chunks"]
 
     if not args.local_only:
-        logger.info(f"Phase 2: Fetching from manjunath5496 (max {args.max_per_repo}/repo)")
-        gh_stats = fetch_and_ingest_github(pipeline, data_dir, args.max_per_repo)
-        logger.info(f"  GitHub: {gh_stats['total_ingested']} PDFs → {gh_stats['total_chunks']} chunks")
+        logger.info(f"Phase 2A: Fetching from manjunath5496 (max {args.max_per_repo}/repo)")
+        gh_stats = fetch_and_ingest_github_pdfs(pipeline, data_dir, args.max_per_repo)
+        logger.info(f"  GitHub PDFs: {gh_stats['total_ingested']} files → {gh_stats['total_chunks']} chunks")
         total_chunks += gh_stats.get("total_chunks", 0)
+
+        if not args.skip_devops_refresh:
+            logger.info("Phase 2B: Refreshing DevOps-Exercises all topics")
+            devops_stats = fetch_and_ingest_devops_exercises(pipeline, data_dir)
+            logger.info(
+                "  DevOps Exercises: "
+                f"{devops_stats['total_files']} files → {devops_stats['total_chunks']} chunks"
+            )
+            total_chunks += devops_stats.get("total_chunks", 0)
+
+        if not args.skip_system_design:
+            logger.info("Phase 2C: Ingesting system-design repository")
+            sd_stats = fetch_and_ingest_system_design(pipeline, data_dir)
+            logger.info(
+                "  System Design: "
+                f"{sd_stats['processed_files']}/{sd_stats['total_files']} files → "
+                f"{sd_stats['total_chunks']} chunks"
+            )
+            total_chunks += sd_stats.get("total_chunks", 0)
 
     elapsed = time.time() - t0
     logger.info(f"\n{'='*50}")
